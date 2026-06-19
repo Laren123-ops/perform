@@ -1139,17 +1139,136 @@
     function addIdentity() {
       const name = prompt('新身份名称（如：杜克留学生 / 携程实习生 / 秋招求职者）:');
       if (!name || !name.trim()) return;
-      const desc = prompt('简短描述（可选）:', '');
+      const desc = prompt('简短描述（可选，如：产品经理实习 / 2026届 / 目标体重52kg）:', '');
       const newId = uid();
       const color = PHASE_COLORS[data.identities.length % PHASE_COLORS.length];
-      data.identities.push({ id: newId, name: name.trim(), desc: desc || '', color, vision: '', goals: [] });
+
+      // Auto-generate vision + goal tree based on identity name + description
+      const generated = aiGenerateIdentityContent(name.trim(), desc);
+
+      data.identities.push({
+        id: newId,
+        name: name.trim(),
+        desc: desc || '',
+        color,
+        vision: generated.vision,
+        goals: generated.goals
+      });
       data.activeIdentityId = newId;
       save();
       renderTabs();
       renderMain();
       updateAiContext();
       updateDailyQuestion();
-      addAiMsg(`新身份【${name.trim()}】已添加！现在给它添加第一个大目标吧。我会自动帮你拆解成小目标。`);
+      addAiMsg(`【${name.trim()}】已添加！\n\n秘书J根据你的身份自动生成了愿景和目标树，你可以直接修改或添加内容。点击目标旁边的 📅 设置截止日期，我会主动提醒你。`);
+    }
+
+    // AI auto-generates identity vision + goals from name + description
+    function aiGenerateIdentityContent(name, desc) {
+      const lower = name.toLowerCase() + ' ' + (desc||'').toLowerCase();
+      let vision = '';
+      const goals = [];
+
+      // ── 实习生 / 携程 / 产品经理实习 ──
+      if (lower.includes('实习') && lower.includes('产品')) {
+        vision = '在实践中建立PM核心能力，产出有说服力的项目成果，为秋招蓄力。';
+        goals.push({ id: uid(), text: '完成实习期核心项目交付', milestone: '', done: false, subGoals: [
+          { id: uid(), text: '掌握业务全链路（需求调研→方案设计→开发跟进→上线复盘）', done: false },
+          { id: uid(), text: '独立产出至少1份完整需求文档', done: false },
+          { id: uid(), text: '跟进1个功能从开发到上线', done: false },
+          { id: uid(), text: '完成中期 review 并形成改进计划', done: false }
+        ]});
+        goals.push({ id: uid(), text: '建立职场可见度和人脉', milestone: '', done: false, subGoals: [
+          { id: uid(), text: '主动参加2次跨部门会议，了解协作流程', done: false },
+          { id: uid(), text: '与mentor进行1次职业发展对话', done: false },
+          { id: uid(), text: '产出一份可复盘的实习总结', done: false }
+        ]});
+        goals.push({ id: uid(), text: '实习顺利收尾并沉淀', milestone: '', done: false, subGoals: [
+          { id: uid(), text: '整理实习期间所有工作成果和数据', done: false },
+          { id: uid(), text: '获取推荐信或实习证明', done: false },
+          { id: uid(), text: '将经历纳入简历并定稿', done: false }
+        ]});
+      }
+      // ── 留学生 / 杜克 / MSEM / 出国 ──
+      else if (lower.includes('留学') || lower.includes('duke') || lower.includes('msem') || lower.includes('出国') || lower.includes('fall')) {
+        vision = '在顶尖学府建立全球视野，深耕可持续商业领域，成为有判断力的专业人士。';
+        goals.push({ id: uid(), text: '完成赴美前全部准备', milestone: '2026.8.1', done: false, subGoals: [
+          { id: uid(), text: 'I-20申请与签证完成', done: false },
+          { id: uid(), text: '体检和必需疫苗接种', done: false },
+          { id: uid(), text: '选课确认（至少3门必修）', done: false },
+          { id: uid(), text: '住宿安排确定', done: false },
+          { id: uid(), text: '中美往返机票购买', done: false }
+        ]});
+        goals.push({ id: uid(), text: '快速适应校园和学术节奏', milestone: '2026.9.30', done: false, subGoals: [
+          { id: uid(), text: '完成第一个月课程并找到学习节奏', done: false },
+          { id: uid(), text: '建立学习小组（找到2-3个固定队友）', done: false },
+          { id: uid(), text: '完成第一次 office hour 拜访教授', done: false }
+        ]});
+        goals.push({ id: uid(), text: '拓展人脉和职业网络', milestone: '2026.12.31', done: false, subGoals: [
+          { id: uid(), text: '参加2场校园招聘会或企业宣讲', done: false },
+          { id: uid(), text: '连接10位同领域校友或同学', done: false },
+          { id: uid(), text: '明确毕业后的职业方向', done: false }
+        ]});
+      }
+      // ── 秋招 / 求职者 / 应届生 / PM ──
+      else if (lower.includes('秋招') || lower.includes('求职') || lower.includes('应届') || (lower.includes('pm') && lower.includes('产品'))) {
+        vision = '找到一家产品与文化都契合的公司，以PM为起点开启职业生涯。';
+        goals.push({ id: uid(), text: '完成秋招申请（目标30家）', milestone: '2026.10.15', done: false, subGoals: [
+          { id: uid(), text: '简历定稿（突出实习经历和项目成果）', done: false },
+          { id: uid(), text: '建立30家目标公司清单', done: false },
+          { id: uid(), text: '每天投递3家，保持节奏', done: false }
+        ]});
+        goals.push({ id: uid(), text: '面试准备到位', milestone: '2026.11.30', done: false, subGoals: [
+          { id: uid(), text: 'PM面试题库系统过一遍', done: false },
+          { id: uid(), text: '准备10个STAR法则核心故事', done: false },
+          { id: uid(), text: '进行5次mock interview', done: false }
+        ]});
+        goals.push({ id: uid(), text: '拿到offer并做出选择', milestone: '2026.12.31', done: false, subGoals: [
+          { id: uid(), text: '比较offer（薪资/成长/文化/城市）', done: false },
+          { id: uid(), text: '与行业前辈交流获取建议', done: false },
+          { id: uid(), text: '做出决定并回复offer', done: false }
+        ]});
+      }
+      // ── 减脂 / 健身 / 减肥 / 体重 ──
+      else if (lower.includes('减脂') || lower.includes('减肥') || lower.includes('健身') || lower.includes('体重') || lower.includes('瘦身')) {
+        vision = '精力充沛、身体轻盈，用最好的身心状态面对每一天的挑战。';
+        const targetWeight = desc.match(/(\d+)kg/) ? desc.match(/(\d+)kg/)[1] + 'kg' : '目标体重';
+        goals.push({ id: uid(), text: '达成' + targetWeight + '体重目标', milestone: '', done: false, subGoals: [
+          { id: uid(), text: '每周运动3次（跑步/健身房/瑜伽等）', done: false },
+          { id: uid(), text: '戒奶茶、高糖高油食物', done: false },
+          { id: uid(), text: '每天早起称重并记录', done: false },
+          { id: uid(), text: '设定每周减重0.5kg的小目标', done: false }
+        ]});
+        goals.push({ id: uid(), text: '建立可持续的健康习惯', milestone: '', done: false, subGoals: [
+          { id: uid(), text: '保证每天7-8小时睡眠', done: false },
+          { id: uid(), text: '每天喝够2L水', done: false },
+          { id: uid(), text: '月度体测数据记录', done: false }
+        ]});
+      }
+      // ── AI / LLM / Web3 / 技术学习 ──
+      else if (lower.includes('ai') || lower.includes('llm') || lower.includes('web3') || lower.includes('技术') || lower.includes('编程') || lower.includes('学习')) {
+        vision = '系统掌握前沿技术，建立可落地的AI/区块链实践能力。';
+        goals.push({ id: uid(), text: '完成核心技术栈学习', milestone: '', done: false, subGoals: [
+          { id: uid(), text: '官方文档/教程系统过一遍', done: false },
+          { id: uid(), text: '完成1个实战小项目', done: false },
+          { id: uid(), text: '整理学习笔记和代码仓库', done: false }
+        ]});
+        goals.push({ id: uid(), text: '产出可展示的项目成果', milestone: '', done: false, subGoals: [
+          { id: uid(), text: '独立完成1个完整项目', done: false },
+          { id: uid(), text: '项目文档和演示完成', done: false },
+          { id: uid(), text: '更新GitHub简历和技术博客', done: false }
+        ]});
+      }
+      // ── Default fallback ──
+      else {
+        vision = '在这个身份上持续成长，成为你想成为的人。';
+        goals.push({ id: uid(), text: '设定这个身份的核心目标', milestone: '', done: false, subGoals: [
+          { id: uid(), text: '明确想要达成的结果', done: false },
+          { id: uid(), text: '拆解成3个可执行的步骤', done: false }
+        ]});
+      }
+
+      return { vision, goals };
     }
 
     function editIdentity(id) {
