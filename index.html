@@ -1270,7 +1270,7 @@
     function seedData() {
       if (data.identities.length > 0) return;
 
-      const id1 = uid(), id2 = uid(), id3 = uid();
+      const id1 = uid(), id2 = uid(), id3 = uid(), id4 = uid();
       data.activeIdentityId = id1;
 
       data.identities = [
@@ -1335,6 +1335,40 @@
         },
         {
           id: id3,
+          name: '携程实习生',
+          desc: '产品经理实习 · 暑期',
+          color: '#6B8E6B',
+          vision: '在实践中建立PM能力体系，产出有价值的项目经验，为秋招积累砝码。',
+          goals: [
+            {
+              id: uid(), text: '完成实习期核心项目', milestone: '2026.8.31', done: false,
+              subGoals: [
+                { id: uid(), text: '掌握业务全链路（调研→方案→落地→复盘）', done: false },
+                { id: uid(), text: '独立产出1份完整需求文档', done: false },
+                { id: uid(), text: '跟进开发测试上线至少1个功能', done: false },
+                { id: uid(), text: '完成中期 review 并拿到反馈', done: false }
+              ]
+            },
+            {
+              id: uid(), text: '建立职场可见度', milestone: '2026.7.31', done: false,
+              subGoals: [
+                { id: uid(), text: '主动参加2次跨部门会议', done: false },
+                { id: uid(), text: '和mentor进行1次职业发展对话', done: false },
+                { id: uid(), text: '产出1份可展示的实习复盘文档', done: false }
+              ]
+            },
+            {
+              id: uid(), text: '实习顺利收尾', milestone: '2026.8.15', done: false,
+              subGoals: [
+                { id: uid(), text: '整理实习期间所有工作成果', done: false },
+                { id: uid(), text: '获取推荐信或实习证明', done: false },
+                { id: uid(), text: '更新简历并纳入这段经历', done: false }
+              ]
+            }
+          ]
+        },
+        {
+          id: id4,
           name: '减脂中',
           desc: '目标体重：52kg（当前约58kg）',
           color: '#8E6B6B',
