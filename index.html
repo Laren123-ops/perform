@@ -1,0 +1,1374 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Perform · 角色管理系统</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,300;0,9..40,400;0,9..40,500;0,9..40,600;1,9..40,300&family=Noto+Serif+SC:wght@300;400;500;600&family=JetBrains+Mono:wght@400;500&family=Playfair+Display:ital,wght@0,400;0,500;0,600;1,400&display=swap" rel="stylesheet">
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    :root {
+      --bg: #F8F5F0;
+      --surface: #FDFBF8;
+      --card: #FFFFFF;
+      --gold: #B8860B;
+      --gold-mid: #D4A84B;
+      --gold-light: #F0D98A;
+      --gold-dim: rgba(184,134,11,0.09);
+      --gold-glow: rgba(184,134,11,0.05);
+      --text: #1C1917;
+      --text-sec: #78716C;
+      --text-muted: #A8A29C;
+      --border: #E7E2D9;
+      --border-light: #F0EBE3;
+      --accent-red: #C0755A;
+      --accent-green: #6B9E6B;
+      --font-display: 'Playfair Display', 'Noto Serif SC', Georgia, serif;
+      --font-body: 'DM Sans', system-ui, sans-serif;
+      --font-mono: 'JetBrains Mono', monospace;
+      --radius: 14px;
+      --radius-sm: 8px;
+      --radius-xs: 5px;
+    }
+    html { font-size: 16px; }
+    body { background: var(--bg); color: var(--text); font-family: var(--font-body); min-height: 100vh; -webkit-font-smoothing: antialiased; }
+    ::-webkit-scrollbar { width: 3px; }
+    ::-webkit-scrollbar-track { background: var(--bg); }
+    ::-webkit-scrollbar-thumb { background: var(--border); border-radius: 2px; }
+
+    /* ── Topbar ── */
+    .topbar {
+      background: var(--card);
+      border-bottom: 1px solid var(--border);
+      padding: 0 24px;
+      height: 58px;
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      position: sticky;
+      top: 0;
+      z-index: 100;
+    }
+    .topbar-title {
+      font-family: var(--font-display);
+      font-size: 18px;
+      font-weight: 500;
+      flex-shrink: 0;
+    }
+    .topbar-title em { font-style: italic; color: var(--gold); }
+    .topbar-divider { width: 1px; height: 22px; background: var(--border); flex-shrink: 0; }
+    .identity-tabs {
+      display: flex;
+      gap: 4px;
+      flex: 1;
+      overflow-x: auto;
+      scrollbar-width: none;
+    }
+    .identity-tabs::-webkit-scrollbar { display: none; }
+    .identity-tab {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      padding: 5px 13px;
+      border-radius: 18px;
+      border: 1.5px solid transparent;
+      cursor: pointer;
+      font-size: 13px;
+      font-family: var(--font-body);
+      color: var(--text-sec);
+      background: transparent;
+      transition: all 0.18s;
+      white-space: nowrap;
+      flex-shrink: 0;
+    }
+    .identity-tab:hover { color: var(--text); background: var(--gold-glow); }
+    .identity-tab.active { border-color: var(--gold); color: var(--gold); background: var(--gold-dim); }
+    .identity-tab-dot { width: 7px; height: 7px; border-radius: 50%; flex-shrink: 0; }
+    .topbar-right { display: flex; align-items: center; gap: 10px; flex-shrink: 0; }
+    .topbar-date { font-family: var(--font-mono); font-size: 11px; color: var(--text-sec); text-align: right; line-height: 1.7; }
+    .topbar-add-btn {
+      display: flex;
+      align-items: center;
+      gap: 5px;
+      padding: 6px 14px;
+      border-radius: 18px;
+      border: 1.5px solid var(--gold);
+      background: var(--gold-dim);
+      color: var(--gold);
+      cursor: pointer;
+      font-size: 12px;
+      font-family: var(--font-body);
+      font-weight: 500;
+      transition: all 0.18s;
+      flex-shrink: 0;
+    }
+    .topbar-add-btn:hover { background: var(--gold); color: #fff; }
+
+    /* Import button */
+    .topbar-import-btn {
+      display: flex;
+      align-items: center;
+      gap: 5px;
+      padding: 6px 14px;
+      border-radius: 18px;
+      border: 1.5px solid var(--border);
+      background: transparent;
+      color: var(--text-sec);
+      cursor: pointer;
+      font-size: 12px;
+      font-family: var(--font-body);
+      transition: all 0.18s;
+      flex-shrink: 0;
+    }
+    .topbar-import-btn:hover { border-color: var(--gold-mid); color: var(--gold); }
+    .import-input { display: none; }
+
+    /* ── Layout ── */
+    .main { display: flex; flex: 1; overflow: hidden; min-height: calc(100vh - 58px); }
+
+    /* ── Left: Identity Detail ── */
+    .left-panel { flex: 1; overflow-y: auto; padding: 28px 24px; min-width: 0; }
+
+    /* Identity Header */
+    .identity-header { margin-bottom: 28px; }
+    .identity-header-top { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 6px; }
+    .identity-name {
+      font-family: var(--font-display);
+      font-size: 26px;
+      font-weight: 500;
+      letter-spacing: -0.3px;
+    }
+    .identity-desc { font-size: 13px; color: var(--text-sec); margin-bottom: 16px; }
+    .identity-header-actions { display: flex; gap: 6px; }
+
+    /* Goal Tree */
+    .goal-card {
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      overflow: hidden;
+      margin-bottom: 16px;
+      transition: border-color 0.2s;
+    }
+    .goal-card:hover { border-color: rgba(184,134,11,0.3); }
+    .goal-card-header {
+      padding: 14px 18px;
+      border-bottom: 1px solid var(--border-light);
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+    .goal-card-title {
+      font-family: var(--font-display);
+      font-size: 15px;
+      font-weight: 500;
+    }
+    .goal-card-meta {
+      font-family: var(--font-mono);
+      font-size: 10px;
+      color: var(--text-muted);
+    }
+    .goal-level-label {
+      font-family: var(--font-mono);
+      font-size: 10px;
+      letter-spacing: 2px;
+      text-transform: uppercase;
+      color: var(--text-muted);
+      padding: 12px 18px 6px;
+    }
+    .goal-level-label span { color: var(--gold); }
+
+    /* Goal items */
+    .goal-item {
+      margin: 0 18px 8px;
+      border: 1px solid var(--border-light);
+      border-radius: var(--radius-sm);
+      background: var(--surface);
+      overflow: hidden;
+      transition: border-color 0.15s;
+    }
+    .goal-item:hover { border-color: var(--gold-light); }
+    .goal-item.done { opacity: 0.5; }
+    .goal-item-header {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding: 10px 12px;
+      cursor: pointer;
+    }
+    .goal-expand {
+      width: 18px;
+      height: 18px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 11px;
+      color: var(--text-muted);
+      flex-shrink: 0;
+      transition: transform 0.15s;
+    }
+    .goal-expand.open { transform: rotate(90deg); }
+    .goal-check {
+      width: 16px;
+      height: 16px;
+      border-radius: 50%;
+      border: 1.5px solid var(--border);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      flex-shrink: 0;
+      cursor: pointer;
+      transition: all 0.15s;
+    }
+    .goal-check:hover { border-color: var(--gold); }
+    .goal-check.checked { background: var(--gold); border-color: var(--gold); }
+    .goal-check.checked::after { content: '✓'; font-size: 8px; color: #fff; font-weight: 700; }
+    .goal-title { flex: 1; font-size: 13px; font-weight: 500; }
+    .goal-item.done .goal-title { text-decoration: line-through; color: var(--text-sec); }
+    .goal-badge {
+      font-family: var(--font-mono);
+      font-size: 9px;
+      background: var(--gold-dim);
+      color: var(--gold);
+      padding: 1px 6px;
+      border-radius: 8px;
+      flex-shrink: 0;
+    }
+    .goal-actions { display: flex; gap: 4px; opacity: 0; transition: opacity 0.12s; }
+    .goal-item:hover .goal-actions { opacity: 1; }
+    .goal-action-btn {
+      background: none; border: none; cursor: pointer;
+      font-size: 12px; color: var(--text-muted);
+      padding: 2px 4px; border-radius: 3px;
+      transition: color 0.12s;
+    }
+    .goal-action-btn:hover { color: var(--text); }
+    .goal-action-btn.del:hover { color: var(--accent-red); }
+
+    /* Children (sub-goals) */
+    .goal-children {
+      border-top: 1px solid var(--border-light);
+      background: rgba(0,0,0,0.01);
+      display: none;
+      padding: 8px 12px 8px 40px;
+    }
+    .goal-children.open { display: block; }
+    .sub-goal-item {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding: 6px 8px;
+      border-radius: var(--radius-xs);
+      cursor: pointer;
+      transition: background 0.12s;
+    }
+    .sub-goal-item:hover { background: var(--gold-glow); }
+    .sub-goal-item.done { opacity: 0.5; }
+    .sub-goal-check {
+      width: 13px; height: 13px;
+      border-radius: 50%;
+      border: 1.5px solid var(--border);
+      display: flex; align-items: center; justify-content: center;
+      flex-shrink: 0; transition: all 0.12s;
+    }
+    .sub-goal-item.done .sub-goal-check { background: var(--gold); border-color: var(--gold); }
+    .sub-goal-check::after { content: '✓'; font-size: 7px; color: #fff; font-weight: 700; display: none; }
+    .sub-goal-item.done .sub-goal-check::after { display: block; }
+    .sub-goal-text { flex: 1; font-size: 12px; }
+    .sub-goal-item.done .sub-goal-text { text-decoration: line-through; color: var(--text-sec); }
+    .sub-goal-ai {
+      font-size: 10px; color: var(--gold);
+      cursor: pointer; padding: 2px 5px;
+      border-radius: 3px; opacity: 0;
+      transition: all 0.12s;
+    }
+    .sub-goal-item:hover .sub-goal-ai { opacity: 1; }
+    .sub-goal-ai:hover { background: var(--gold-dim); }
+
+    /* Add Goal */
+    .add-goal-row {
+      display: flex;
+      gap: 6px;
+      padding: 8px 18px 14px;
+    }
+    .add-goal-input {
+      flex: 1;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-sm);
+      padding: 7px 11px;
+      font-size: 12px;
+      font-family: var(--font-body);
+      color: var(--text);
+      outline: none;
+      transition: border-color 0.15s;
+    }
+    .add-goal-input:focus { border-color: var(--gold); }
+    .add-goal-input::placeholder { color: var(--text-muted); }
+    .add-goal-btn {
+      background: var(--gold); color: #fff;
+      border: none; border-radius: var(--radius-sm);
+      padding: 7px 14px; font-size: 12px;
+      font-family: var(--font-body); cursor: pointer;
+      transition: opacity 0.15s;
+    }
+    .add-goal-btn:hover { opacity: 0.85; }
+
+    /* Milestone / date marker */
+    .milestone-marker {
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+      font-family: var(--font-mono);
+      font-size: 10px;
+      color: var(--gold);
+      background: var(--gold-dim);
+      padding: 2px 7px;
+      border-radius: 8px;
+      margin-left: 4px;
+    }
+
+    /* ── AI Right Panel ── */
+    .right-panel {
+      width: 300px;
+      flex-shrink: 0;
+      background: var(--card);
+      border-left: 1px solid var(--border);
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+    }
+    .ai-header {
+      padding: 16px 18px 12px;
+      border-bottom: 1px solid var(--border-light);
+    }
+    .ai-header-title {
+      font-family: var(--font-display);
+      font-size: 15px;
+      font-weight: 500;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+    .ai-badge {
+      font-family: var(--font-mono);
+      font-size: 9px;
+      background: var(--gold-dim);
+      color: var(--gold);
+      padding: 2px 6px;
+      border-radius: 8px;
+    }
+    .ai-header-sub { font-size: 11px; color: var(--text-muted); margin-top: 2px; }
+
+    /* Daily Check-in */
+    .daily-checkin {
+      padding: 12px 16px;
+      border-bottom: 1px solid var(--border-light);
+    }
+    .daily-checkin-label {
+      font-family: var(--font-mono);
+      font-size: 9px;
+      letter-spacing: 2px;
+      text-transform: uppercase;
+      color: var(--text-muted);
+      margin-bottom: 8px;
+    }
+    .daily-question {
+      font-size: 13px;
+      font-weight: 500;
+      color: var(--text);
+      margin-bottom: 10px;
+      line-height: 1.6;
+    }
+    .daily-options { display: flex; gap: 6px; flex-wrap: wrap; }
+    .daily-option {
+      padding: 5px 12px;
+      border-radius: 14px;
+      border: 1px solid var(--border);
+      background: var(--surface);
+      font-size: 12px;
+      cursor: pointer;
+      transition: all 0.15s;
+      font-family: var(--font-body);
+      color: var(--text-sec);
+    }
+    .daily-option:hover { border-color: var(--gold-mid); color: var(--gold); background: var(--gold-glow); }
+    .daily-option.selected { border-color: var(--gold); color: var(--gold); background: var(--gold-dim); }
+    .daily-answer-input {
+      width: 100%;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-sm);
+      padding: 7px 10px;
+      font-size: 12px;
+      font-family: var(--font-body);
+      color: var(--text);
+      outline: none;
+      resize: none;
+      transition: border-color 0.15s;
+      margin-top: 8px;
+    }
+    .daily-answer-input:focus { border-color: var(--gold); }
+    .daily-submit {
+      margin-top: 8px;
+      background: var(--gold); color: #fff;
+      border: none; border-radius: var(--radius-sm);
+      padding: 7px 16px; font-size: 12px;
+      font-family: var(--font-body); cursor: pointer;
+      transition: opacity 0.15s;
+    }
+    .daily-submit:hover { opacity: 0.85; }
+    .daily-checkin-log { margin-top: 10px; font-size: 11px; color: var(--text-muted); font-family: var(--font-mono); }
+
+    /* AI Messages */
+    .ai-messages { flex: 1; overflow-y: auto; padding: 12px 14px; display: flex; flex-direction: column; gap: 10px; max-height: 300px; }
+    .ai-msg { display: flex; gap: 8px; }
+    .ai-msg-avatar {
+      width: 24px; height: 24px;
+      border-radius: 50%;
+      background: var(--gold-dim);
+      border: 1px solid var(--gold-light);
+      display: flex; align-items: center; justify-content: center;
+      font-size: 11px; flex-shrink: 0;
+    }
+    .ai-msg-body { flex: 1; min-width: 0; }
+    .ai-msg-role { font-family: var(--font-mono); font-size: 9px; color: var(--gold); margin-bottom: 2px; }
+    .ai-msg-text {
+      font-size: 12px; color: var(--text); line-height: 1.7;
+      background: var(--surface); border: 1px solid var(--border-light);
+      border-radius: 0 8px 8px 8px; padding: 7px 10px;
+    }
+    .ai-msg-text p { margin-bottom: 3px; }
+    .ai-msg-text p:last-child { margin-bottom: 0; }
+    .ai-msg-text ul { margin: 3px 0 3px 14px; }
+    .ai-msg-text li { margin-bottom: 2px; }
+    .ai-msg-text strong { color: var(--gold); }
+
+    /* AI Reminders */
+    .ai-reminders { padding: 10px 14px; border-top: 1px solid var(--border-light); max-height: 140px; overflow-y: auto; }
+    .ai-reminders-label { font-family: var(--font-mono); font-size: 9px; letter-spacing: 2px; text-transform: uppercase; color: var(--text-muted); margin-bottom: 6px; }
+    .ai-reminder-item {
+      display: flex; gap: 6px; padding: 5px 7px;
+      border-radius: var(--radius-xs); background: var(--surface);
+      border: 1px solid var(--border-light); margin-bottom: 4px;
+      font-size: 11px; cursor: pointer; transition: all 0.12s;
+    }
+    .ai-reminder-item:hover { border-color: var(--gold-light); background: var(--gold-glow); }
+    .ai-reminder-time { font-family: var(--font-mono); font-size: 10px; color: var(--gold); flex-shrink: 0; }
+    .ai-reminder-text { color: var(--text-sec); }
+    .ai-reminder-empty { font-size: 11px; color: var(--text-muted); }
+
+    /* AI Input */
+    .ai-input-area { padding: 10px 14px; border-top: 1px solid var(--border-light); }
+    .ai-input-row { display: flex; gap: 6px; }
+    .ai-input {
+      flex: 1; background: var(--surface); border: 1px solid var(--border);
+      border-radius: var(--radius-sm); padding: 7px 10px;
+      font-size: 12px; font-family: var(--font-body); color: var(--text);
+      outline: none; transition: border-color 0.15s;
+    }
+    .ai-input:focus { border-color: var(--gold); }
+    .ai-input::placeholder { color: var(--text-muted); }
+    .ai-send-btn {
+      background: var(--gold); color: #fff; border: none;
+      border-radius: var(--radius-sm); width: 32px; height: 32px;
+      font-size: 16px; cursor: pointer;
+      display: flex; align-items: center; justify-content: center;
+      transition: opacity 0.15s; flex-shrink: 0;
+    }
+    .ai-send-btn:hover { opacity: 0.85; }
+
+    /* Empty state */
+    .empty-state { text-align: center; padding: 60px 20px; color: var(--text-muted); }
+    .empty-state-icon { font-size: 40px; margin-bottom: 14px; }
+    .empty-state-title { font-family: var(--font-display); font-size: 20px; color: var(--text-sec); margin-bottom: 8px; }
+    .empty-state-sub { font-size: 13px; line-height: 1.8; }
+
+    /* Icon btn */
+    .icon-btn {
+      background: none; border: 1px solid var(--border);
+      cursor: pointer; font-size: 11px;
+      color: var(--text-sec); padding: 3px 8px;
+      border-radius: var(--radius-xs);
+      transition: all 0.12s; font-family: var(--font-body);
+    }
+    .icon-btn:hover { border-color: var(--gold-mid); color: var(--gold); }
+    .icon-btn.danger:hover { border-color: var(--accent-red); color: var(--accent-red); }
+
+    /* Toast */
+    .toast {
+      position: fixed; bottom: 24px; right: 24px;
+      background: var(--card); border: 1px solid var(--gold-light);
+      border-radius: var(--radius); padding: 12px 16px;
+      box-shadow: 0 8px 30px rgba(0,0,0,0.10);
+      max-width: 280px; z-index: 300;
+      animation: toastIn 0.3s ease;
+    }
+    .toast-title { font-weight: 600; font-size: 13px; color: var(--gold); margin-bottom: 3px; }
+    .toast-body { font-size: 12px; color: var(--text-sec); line-height: 1.6; }
+    @keyframes toastIn { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: translateY(0); } }
+
+    /* Import Modal */
+    .modal-overlay {
+      position: fixed; inset: 0;
+      background: rgba(0,0,0,0.4);
+      display: flex; align-items: center; justify-content: center;
+      z-index: 400; backdrop-filter: blur(2px);
+    }
+    .modal { background: var(--card); border-radius: var(--radius); padding: 28px; max-width: 480px; width: 90%; box-shadow: 0 20px 60px rgba(0,0,0,0.2); }
+    .modal-title { font-family: var(--font-display); font-size: 20px; font-weight: 500; margin-bottom: 6px; }
+    .modal-sub { font-size: 12px; color: var(--text-sec); margin-bottom: 20px; line-height: 1.7; }
+    .modal-dropzone {
+      border: 2px dashed var(--border);
+      border-radius: var(--radius-sm);
+      padding: 32px 20px;
+      text-align: center;
+      cursor: pointer;
+      transition: all 0.2s;
+      margin-bottom: 16px;
+    }
+    .modal-dropzone:hover { border-color: var(--gold); background: var(--gold-glow); }
+    .modal-dropzone-icon { font-size: 28px; margin-bottom: 8px; }
+    .modal-dropzone-text { font-size: 13px; color: var(--text-sec); }
+    .modal-dropzone-text strong { color: var(--gold); }
+    .modal-import-btn {
+      width: 100%; background: var(--gold); color: #fff;
+      border: none; border-radius: var(--radius-sm);
+      padding: 10px; font-size: 13px; font-family: var(--font-body);
+      cursor: pointer; transition: opacity 0.15s;
+    }
+    .modal-import-btn:hover { opacity: 0.85; }
+    .modal-close {
+      position: absolute; top: 16px; right: 16px;
+      background: none; border: none; font-size: 18px;
+      cursor: pointer; color: var(--text-muted);
+    }
+    .modal-import-preview {
+      background: var(--surface); border: 1px solid var(--border);
+      border-radius: var(--radius-sm); padding: 12px; margin-bottom: 12px;
+      font-size: 12px; color: var(--text-sec); max-height: 120px; overflow-y: auto;
+      line-height: 1.8;
+    }
+    .modal-import-result { font-size: 12px; color: var(--accent-green); margin-top: 8px; line-height: 1.7; }
+
+    /* Responsive */
+    @media (max-width: 800px) {
+      .right-panel { display: none; }
+    }
+
+    @keyframes fadeUp { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+    .left-panel { animation: fadeUp 0.5s ease both; }
+  </style>
+</head>
+<body>
+  <!-- Topbar -->
+  <div class="topbar">
+    <div class="topbar-title">Perform</div>
+    <div class="topbar-divider"></div>
+    <div class="identity-tabs" id="identityTabs"></div>
+    <div class="topbar-right">
+      <div class="topbar-date" id="topbarDate"></div>
+      <label class="topbar-import-btn">
+        <span>↗</span> 导入
+        <input type="file" class="import-input" id="importInput" accept=".pdf,.png,.jpg,.jpeg,.txt,.csv" onchange="handleImport(event)"/>
+      </label>
+      <button class="topbar-add-btn" onclick="addIdentity()">+ 身份</button>
+    </div>
+  </div>
+
+  <!-- Main -->
+  <div class="main">
+    <div class="left-panel" id="leftPanel"></div>
+
+    <!-- AI Secretary -->
+    <div class="right-panel">
+      <div class="ai-header">
+        <div class="ai-header-title">秘书 <span class="ai-badge">J · 超有条</span></div>
+        <div class="ai-header-sub" id="aiContextLabel">了解你所有的身份和目标...</div>
+      </div>
+
+      <!-- Daily Check-in -->
+      <div class="daily-checkin" id="dailyCheckin">
+        <div class="daily-checkin-label">今日对话 · Daily Check-in</div>
+        <div class="daily-question" id="dailyQuestion">今天，你为「杜克留学生」做了什么？</div>
+        <div class="daily-options" id="dailyOptions">
+          <div class="daily-option" onclick="selectDailyOption(this,'做了很多')">做了很多</div>
+          <div class="daily-option" onclick="selectDailyOption(this,'一点点')">一点点</div>
+          <div class="daily-option" onclick="selectDailyOption(this,'还没来得及')">还没来得及</div>
+        </div>
+        <textarea class="daily-answer-input" id="dailyAnswer" placeholder="写点什么记录今天..." rows="2" onkeydown="if(event.key==='Enter'&&event.ctrlKey)submitDaily()"></textarea>
+        <button class="daily-submit" onclick="submitDaily()">记录</button>
+        <div class="daily-checkin-log" id="dailyLog"></div>
+      </div>
+
+      <!-- AI Messages -->
+      <div class="ai-messages" id="aiMessages">
+        <div class="ai-msg">
+          <div class="ai-msg-avatar">🤖</div>
+          <div class="ai-msg-body">
+            <div class="ai-msg-role">秘书</div>
+            <div class="ai-msg-text">
+              <p>你好！我是你的专属秘书 J。</p>
+              <p>我了解你所有的身份和目标，每天会主动和你 check-in，也会帮你拆解任务、主动提醒重要节点。</p>
+              <p>有任何需要直接在下面问我！</p>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Reminders -->
+      <div class="ai-reminders" id="aiReminders">
+        <div class="ai-reminders-label">⚡ 即将到期</div>
+      </div>
+
+      <!-- AI Input -->
+      <div class="ai-input-area">
+        <div class="ai-input-row">
+          <input class="ai-input" id="aiInput" placeholder="问秘书任何事..." onkeydown="if(event.key==='Enter')sendAiMsg()"/>
+          <button class="ai-send-btn" onclick="sendAiMsg()">›</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Import Modal -->
+  <div class="modal-overlay" id="importModal" style="display:none">
+    <div class="modal" style="position:relative">
+      <button class="modal-close" onclick="closeImportModal()">×</button>
+      <div class="modal-title">导入日程</div>
+      <div class="modal-sub">上传 PDF、图片或文本文件，我会识别其中的日期和事件，帮助你快速填充目标。</div>
+      <div class="modal-dropzone" onclick="document.getElementById('importFile').click()">
+        <div class="modal-dropzone-icon">📄</div>
+        <div class="modal-dropzone-text">点击或拖拽文件到这里<br><strong>支持 PDF / 图片 / TXT</strong></div>
+        <input type="file" id="importFile" style="display:none" accept=".pdf,.png,.jpg,.jpeg,.txt,.csv" onchange="handleImportFile(event)"/>
+      </div>
+      <div class="modal-import-preview" id="importPreview" style="display:none"></div>
+      <button class="modal-import-btn" id="importConfirmBtn" onclick="confirmImport()" style="display:none">确认导入</button>
+      <div class="modal-import-result" id="importResult"></div>
+    </div>
+  </div>
+
+  <script>
+    // ── Store ──
+    const STORE = 'perform_v1';
+    let data = load();
+
+    const PHASE_COLORS = ['#C9A84C','#8B7355','#6B8E6B','#7A6B8E','#8E6B6B','#6B8E8E','#8E8E6B','#6B7A8E'];
+
+    const DAILY_QUESTIONS = [
+      '今天，你为「{identity}」做了什么？',
+      '今天，「{identity}」有什么进展？',
+      '今天，「{identity}」让你感到满意吗？',
+      '「{identity}」今天的 to-do 完成了吗？',
+      '今天在「{identity}」上遇到了什么挑战？'
+    ];
+
+    function defaultData() {
+      return {
+        identities: [],
+        activeIdentityId: null,
+        nextId: 100,
+        dailyCheckins: [],
+        lastCheckinDate: null
+      };
+    }
+
+    function load() {
+      try { return JSON.parse(localStorage.getItem(STORE)) || defaultData(); }
+      catch { return defaultData(); }
+    }
+    function save() { localStorage.setItem(STORE, JSON.stringify(data)); }
+    function uid() { return data.nextId++; }
+    function escHtml(str) {
+      if (!str && str !== 0) return '';
+      return String(str).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+    }
+
+    // ── Date ──
+    function renderDate() {
+      const now = new Date();
+      const days = ['日','一','二','三','四','五','六'];
+      document.getElementById('topbarDate').innerHTML =
+        `${now.getFullYear()}.${(now.getMonth()+1).toString().padStart(2,'0')}.${now.getDate().toString().padStart(2,'0')}<br>` +
+        `<span style="color:var(--text-muted)">周${days[now.getDay()]} ${now.getHours().toString().padStart(2,'0')}:${now.getMinutes().toString().padStart(2,'0')}</span>`;
+    }
+
+    // ── AI Breakdown ──
+    function aiBreakdown(text) {
+      const lower = text.toLowerCase();
+      const tasks = [];
+      if (lower.includes('visa') || lower.includes('面签')) {
+        tasks.push({ text: '整理面签材料（护照/I-20/DS-160确认页/SEVIS收据）', urgent: true });
+        tasks.push({ text: '练习面签常见问题', urgent: true });
+        tasks.push({ text: '准备1分钟英文自我介绍', urgent: true });
+        tasks.push({ text: '预订大使馆附近酒店和机票', urgent: false });
+      } else if (lower.includes('申请') || lower.includes('application')) {
+        tasks.push({ text: '检查申请材料完整度', urgent: true });
+        tasks.push({ text: '确认推荐信已发送', urgent: true });
+        tasks.push({ text: '提交前最后检查', urgent: false });
+      } else if (lower.includes('面试') || lower.includes('interview')) {
+        tasks.push({ text: '研究公司/岗位背景', urgent: true });
+        tasks.push({ text: '准备STAR法则回答（3-5个故事）', urgent: true });
+        tasks.push({ text: '准备反问面试官的问题', urgent: false });
+      } else if (lower.includes('offer') || lower.includes('录取')) {
+        tasks.push({ text: '确认offer截止日期', urgent: true });
+        tasks.push({ text: '与家人商量决定', urgent: true });
+      } else if (lower.includes('体检') || lower.includes('疫苗') || lower.includes('medical')) {
+        tasks.push({ text: '预约体检中心', urgent: true });
+        tasks.push({ text: '了解所需疫苗清单', urgent: true });
+      } else if (lower.includes('选课') || lower.includes('course')) {
+        tasks.push({ text: '查看必修课要求', urgent: true });
+        tasks.push({ text: '研究教授评价', urgent: false });
+      } else if (lower.includes('考试') || lower.includes('exam')) {
+        tasks.push({ text: '确认考试时间和地点', urgent: true });
+        tasks.push({ text: '制定复习计划', urgent: true });
+      } else {
+        tasks.push({ text: '确认具体时间和细节', urgent: true });
+        tasks.push({ text: '准备相关材料/文件', urgent: true });
+        tasks.push({ text: '设提前提醒', urgent: false });
+      }
+      return tasks;
+    }
+
+    // ── AI Reply ──
+    function aiReply(msg) {
+      const lower = msg.toLowerCase();
+
+      if (lower.includes('总结') || lower.includes('overview') || lower.includes('状态')) {
+        if (!data.identities.length) return ['你还没有添加任何身份！'];
+        return data.identities.map(id => {
+          const done = countDoneGoals(id);
+          const total = countTotalGoals(id);
+          return `【${id.name}】 ${done}/${total} 目标完成`;
+        });
+      }
+      if (lower.includes('提醒') || lower.includes('日程') || lower.includes('接下来')) {
+        const allGoals = data.identities.flatMap(id =>
+          flattenGoals(id).filter(g => !g.done).map(g => ({ ...g, identityName: id.name }))
+        );
+        const upcoming = allGoals.slice(0, 5);
+        if (!upcoming.length) return ['目前没有待完成的目标，太棒了！'];
+        return ['接下来有几个重要目标：', ...upcoming.map(g => `• ${g.identityName} · ${g.text}（${g.milestone||'未设截止'}）`)];
+      }
+      if (lower.includes('建议') || lower.includes('怎么') || lower.includes('下一步')) {
+        const id = getActiveIdentity();
+        if (!id) return ['先在顶部选择一个身份'];
+        const next = flattenGoals(id).find(g => !g.done);
+        if (!next) return [`【${id.name}】所有目标都已完成！`];
+        const b = aiBreakdown(next.text);
+        return [`关于「${next.text}」，建议你立刻完成：`, ...b.slice(0,3).map(t => `• ${t.text}${t.urgent?' 🔴':''}`)];
+      }
+      return ['请告诉我你需要什么帮助——查看目标状态、提醒、或者帮你拆解任务？'];
+    }
+
+    function flattenGoals(identity, parentPath = '') {
+      return (identity.goals || []).flatMap(g => {
+        const path = parentPath ? parentPath + ' › ' + g.text : g.text;
+        const subs = (g.subGoals || []).map(s => ({ ...s, parentPath: path }));
+        return [{ ...g, path }, ...subs];
+      });
+    }
+    function countDoneGoals(identity) { return flattenGoals(identity).filter(g => g.done).length; }
+    function countTotalGoals(identity) { return flattenGoals(identity).length; }
+    function getActiveIdentity() { return data.identities.find(i => i.id === data.activeIdentityId); }
+
+    // ── AI UI ──
+    function addAiMsg(content, role = '秘书') {
+      const container = document.getElementById('aiMessages');
+      const div = document.createElement('div');
+      div.className = 'ai-msg';
+      div.innerHTML = `
+        <div class="ai-msg-avatar">🤖</div>
+        <div class="ai-msg-body">
+          <div class="ai-msg-role">${role}</div>
+          <div class="ai-msg-text"><p>${escHtml(content).replace(/\n/g,'</p><p>')}</p></div>
+        </div>`;
+      container.appendChild(div);
+      container.scrollTop = container.scrollHeight;
+    }
+
+    function sendAiMsg() {
+      const input = document.getElementById('aiInput');
+      const text = input.value.trim();
+      if (!text) return;
+      const div = document.createElement('div');
+      div.className = 'ai-msg';
+      div.style = 'flex-direction:row-reverse';
+      div.innerHTML = `
+        <div style="width:24px;height:24px;border-radius:50%;background:var(--gold-dim);border:1px solid var(--gold-light);display:flex;align-items:center;justify-content:center;font-size:11px;flex-shrink:0">😊</div>
+        <div style="flex:1;min-width:0">
+          <div style="font-family:var(--font-mono);font-size:9px;color:var(--text-muted);margin-bottom:2px;text-align:right">你</div>
+          <div style="font-size:12px;color:var(--text);line-height:1.7;background:var(--gold-dim);border:1px solid var(--gold-light);border-radius:8px 0 8px 8px;padding:7px 10px;text-align:right">${escHtml(text)}</div>
+        </div>`;
+      document.getElementById('aiMessages').appendChild(div);
+      input.value = '';
+      setTimeout(() => {
+        const replies = aiReply(text);
+        replies.forEach(r => addAiMsg(r));
+      }, 400);
+    }
+
+    function updateAiContext() {
+      const id = getActiveIdentity();
+      document.getElementById('aiContextLabel').textContent =
+        id ? `当前：${id.name}` : '了解你所有的身份和目标...';
+    }
+
+    function updateAiReminders() {
+      const container = document.getElementById('aiReminders');
+      const allGoals = data.identities.flatMap(id =>
+        flattenGoals(id).filter(g => !g.done && g.milestone).map(g => ({ ...g, identityName: id.name }))
+      );
+      const upcoming = allGoals.slice(0, 5);
+      container.innerHTML = '<div class="ai-reminders-label">⚡ 即将到期</div>' +
+        (upcoming.length === 0 ? '<div class="ai-reminder-empty">暂无截止目标</div>' :
+          upcoming.map(g => `<div class="ai-reminder-item">
+            <span class="ai-reminder-time">${escHtml(g.milestone||'')}</span>
+            <span class="ai-reminder-text">${escHtml(g.identityName)} · ${escHtml(g.text)}</span>
+          </div>`).join(''));
+    }
+
+    // ── Daily Check-in ──
+    let selectedDailyOption = null;
+    function updateDailyQuestion() {
+      const id = getActiveIdentity();
+      if (!id) {
+        document.getElementById('dailyQuestion').textContent = '先添加一个身份，开始每日对话吧';
+        return;
+      }
+      const qs = DAILY_QUESTIONS;
+      const q = qs[Math.floor(Math.random() * qs.length)].replace('{identity}', id.name);
+      document.getElementById('dailyQuestion').textContent = q;
+      selectedDailyOption = null;
+      document.querySelectorAll('.daily-option').forEach(o => o.classList.remove('selected'));
+      const log = data.dailyCheckins.filter(c => c.identityId === id.id).slice(-1)[0];
+      const logEl = document.getElementById('dailyLog');
+      if (log) {
+        logEl.textContent = `上次：${log.option || log.answer?.slice(0,20) || '...'}`;
+      } else {
+        logEl.textContent = '';
+      }
+    }
+
+    function selectDailyOption(el, val) {
+      document.querySelectorAll('.daily-option').forEach(o => o.classList.remove('selected'));
+      el.classList.add('selected');
+      selectedDailyOption = val;
+      const input = document.getElementById('dailyAnswer');
+      input.focus();
+    }
+
+    function submitDaily() {
+      const id = getActiveIdentity();
+      if (!id) return;
+      const answer = document.getElementById('dailyAnswer').value.trim();
+      const checkin = {
+        identityId: id.id,
+        option: selectedDailyOption,
+        answer,
+        date: new Date().toLocaleDateString('zh-CN')
+      };
+      data.dailyCheckins.push(checkin);
+      data.lastCheckinDate = new Date().toDateString();
+      save();
+      document.getElementById('dailyAnswer').value = '';
+      selectedDailyOption = null;
+      document.querySelectorAll('.daily-option').forEach(o => o.classList.remove('selected'));
+      const logEl = document.getElementById('dailyLog');
+      logEl.textContent = `✓ 已记录 ${checkin.date}`;
+      addAiMsg(`收到！你今天的记录已保存。继续加油，${id.name} 的目标一定能完成。`);
+    }
+
+    // ── Render Tabs ──
+    function renderTabs() {
+      const tabs = document.getElementById('identityTabs');
+      tabs.innerHTML = data.identities.map(id => `
+        <button class="identity-tab ${id.id === data.activeIdentityId ? 'active' : ''}" onclick="selectIdentity(${id.id})">
+          <span class="identity-tab-dot" style="background:${id.color||'#C9A84C'}"></span>
+          ${escHtml(id.name)}
+        </button>
+      `).join('');
+    }
+
+    function selectIdentity(id) {
+      data.activeIdentityId = id;
+      save();
+      renderTabs();
+      renderMain();
+      updateAiContext();
+      updateDailyQuestion();
+    }
+
+    // ── Render Main ──
+    function renderMain() {
+      const panel = document.getElementById('leftPanel');
+      const id = getActiveIdentity();
+
+      if (!id) {
+        panel.innerHTML = `
+          <div class="empty-state">
+            <div class="empty-state-icon">✦</div>
+            <div class="empty-state-title">欢迎来到 Perform</div>
+            <div class="empty-state-sub">Perform 帮你管理人生中的每一个角色<br>每个角色有自己的目标树：大目标 → 中目标 → 小目标<br><br>点击右上角 + 身份 添加你的第一个角色</div>
+          </div>`;
+        return;
+      }
+
+      const goals = id.goals || [];
+
+      panel.innerHTML = `
+        <div class="identity-header">
+          <div class="identity-header-top">
+            <div class="identity-name" style="color:${id.color||'var(--text)'}">${escHtml(id.name)}</div>
+            <div class="identity-header-actions">
+              <button class="icon-btn" onclick="editIdentity(${id.id})">✎ 重命名</button>
+              <button class="icon-btn danger" onclick="deleteIdentity(${id.id})">× 删除</button>
+            </div>
+          </div>
+          ${id.desc ? `<div class="identity-desc">${escHtml(id.desc)}</div>` : ''}
+        </div>
+
+        <!-- Vision -->
+        <div class="goal-card">
+          <div class="goal-card-header">
+            <div class="goal-card-title">🎯 愿景</div>
+          </div>
+          <div style="padding:12px 18px">
+            <textarea id="visionInput" style="width:100%;background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:10px 12px;font-size:13px;font-family:var(--font-body);color:var(--text);resize:vertical;min-height:60px;outline:none;line-height:1.7" placeholder="写下这个身份的愿景..." onblur="saveIdentityVision()">${escHtml(id.vision||'')}</textarea>
+          </div>
+        </div>
+
+        <!-- Goals -->
+        <div class="goal-card">
+          <div class="goal-card-header">
+            <div class="goal-card-title">目标树</div>
+            <div class="goal-card-meta">${countDoneGoals(id)}/${countTotalGoals(id)} 完成</div>
+          </div>
+
+          ${goals.length === 0 ? `<div style="padding:16px 18px;color:var(--text-muted);font-size:13px;text-align:center">还没有目标，添加你的第一个大目标吧</div>` : ''}
+
+          ${goals.map((g, gi) => renderGoalItem(g, gi, id))}
+
+          <div class="add-goal-row">
+            <input class="add-goal-input" id="newGoalInput" placeholder="添加大目标（如：通过雅思考试 / 减重到52kg）" onkeydown="if(event.key==='Enter')addGoal(0)"/>
+            <button class="add-goal-btn" onclick="addGoal(0)">+ 添加</button>
+          </div>
+        </div>`;
+    }
+
+    function renderGoalItem(g, gi, identity, isSub = false, parentIndex = null) {
+      const hasChildren = (g.subGoals || []).length > 0;
+      const doneCount = (g.subGoals||[]).filter(s=>s.done).length;
+      const totalCount = (g.subGoals||[]).length;
+
+      return `
+        <div class="goal-item ${g.done ? 'done' : ''}" data-index="${gi}">
+          <div class="goal-item-header" onclick="toggleGoalExpand(this, ${gi}, ${parentIndex})">
+            <div class="goal-expand ${hasChildren ? 'open' : ''}" style="${hasChildren?'':'visibility:hidden'}">▶</div>
+            <div class="goal-check ${g.done ? 'checked' : ''}" onclick="event.stopPropagation();toggleGoalDone(${gi}, ${parentIndex})"></div>
+            <span class="goal-title">${escHtml(g.text)}</span>
+            ${g.milestone ? `<span class="milestone-marker">📅 ${escHtml(g.milestone)}</span>` : ''}
+            ${totalCount > 0 ? `<span class="goal-badge">${doneCount}/${totalCount}</span>` : ''}
+            <div class="goal-actions">
+              <button class="goal-action-btn" onclick="event.stopPropagation();addSubGoal(${gi})" title="添加子目标">+子目标</button>
+              <button class="goal-action-btn" onclick="event.stopPropagation();setGoalMilestone(${gi}, ${parentIndex})" title="设置截止">📅</button>
+              <button class="goal-action-btn del" onclick="event.stopPropagation();deleteGoal(${gi}, ${parentIndex})" title="删除">×</button>
+            </div>
+          </div>
+          ${hasChildren ? `
+            <div class="goal-children open" id="children-${gi}">
+              ${(g.subGoals||[]).map((s, si) => `
+                <div class="sub-goal-item ${s.done ? 'done' : ''}">
+                  <div class="sub-goal-check" onclick="toggleSubGoalDone(${gi}, ${si})"></div>
+                  <span class="sub-goal-text">${escHtml(s.text)}</span>
+                  <span class="sub-goal-ai" onclick="event.stopPropagation();aiBreakSubGoal(${gi}, ${si})" title="AI拆解">✨</span>
+                  <button class="goal-action-btn del" style="opacity:0" onmouseover="this.style.opacity=1" onmouseout="this.style.opacity=0" onclick="event.stopPropagation();deleteSubGoal(${gi},${si})">×</button>
+                </div>
+              `).join('')}
+            </div>` : ''}
+        </div>`;
+    }
+
+    function toggleGoalExpand(el, gi, parentIndex) {
+      const expand = el.querySelector('.goal-expand');
+      const children = document.getElementById('children-' + gi);
+      if (!children) return;
+      const isOpen = children.classList.contains('open');
+      if (isOpen) {
+        children.classList.remove('open');
+        expand.classList.remove('open');
+      } else {
+        children.classList.add('open');
+        expand.classList.add('open');
+      }
+    }
+
+    function toggleGoalDone(gi, parentIndex) {
+      const id = getActiveIdentity();
+      if (!id) return;
+      const goal = id.goals[gi];
+      if (!goal) return;
+      goal.done = !goal.done;
+      if (goal.done) {
+        (goal.subGoals||[]).forEach(s => s.done = true);
+      }
+      save();
+      renderMain();
+      updateAiReminders();
+    }
+
+    function toggleSubGoalDone(gi, si) {
+      const id = getActiveIdentity();
+      if (!id) return;
+      const goal = id.goals[gi];
+      if (!goal || !goal.subGoals) return;
+      goal.subGoals[si].done = !goal.subGoals[si].done;
+      goal.done = goal.subGoals.every(s => s.done);
+      save();
+      renderMain();
+      updateAiReminders();
+    }
+
+    function addGoal(level) {
+      const id = getActiveIdentity();
+      if (!id) return;
+      const input = document.getElementById('newGoalInput');
+      const text = input.value.trim();
+      if (!text) return;
+
+      let milestone = '';
+      const match = text.match(/^([^📅[]+?)[\s📅\[\(](\d{1,4}[.\/]\d{1,2}(?:[\.\/]\d{1,4})?)[)\]]?$/);
+      if (match) { milestone = match[2]; }
+
+      if (!id.goals) id.goals = [];
+      id.goals.push({ id: uid(), text: text.replace(/[\📅📅\[\(].*$/,'').trim(), milestone, done: false, subGoals: [] });
+      input.value = '';
+      save();
+      renderMain();
+      updateAiReminders();
+      addAiMsg(`新目标已添加！记得设置截止日期（点击 📅），我会主动提醒你。`);
+
+      // Auto AI breakdown for big goals
+      const breakdowns = aiBreakdown(text);
+      if (breakdowns.length > 1) {
+        const newestGoal = id.goals[id.goals.length - 1];
+        breakdowns.forEach(b => {
+          newestGoal.subGoals.push({ id: uid(), text: b.text, done: false });
+        });
+        save();
+        renderMain();
+        addAiMsg(`根据这个目标，我帮你拆解了 ${breakdowns.length} 个子目标，已自动添加：`);
+        addAiMsg(`<p>${breakdowns.map(b => '• ' + b.text).join('<br>')}</p>`);
+      }
+    }
+
+    function addSubGoal(gi) {
+      const id = getActiveIdentity();
+      if (!id) return;
+      const text = prompt('子目标内容：');
+      if (!text || !text.trim()) return;
+      if (!id.goals[gi].subGoals) id.goals[gi].subGoals = [];
+      id.goals[gi].subGoals.push({ id: uid(), text: text.trim(), done: false });
+      save();
+      renderMain();
+      updateAiReminders();
+    }
+
+    function deleteGoal(gi, parentIndex) {
+      const id = getActiveIdentity();
+      if (!id) return;
+      if (!confirm('删除这个目标及其所有子目标？')) return;
+      id.goals.splice(gi, 1);
+      save();
+      renderMain();
+      updateAiReminders();
+    }
+
+    function deleteSubGoal(gi, si) {
+      const id = getActiveIdentity();
+      if (!id) return;
+      id.goals[gi].subGoals.splice(si, 1);
+      id.goals[gi].done = (id.goals[gi].subGoals||[]).every(s => s.done);
+      save();
+      renderMain();
+      updateAiReminders();
+    }
+
+    function setGoalMilestone(gi, parentIndex) {
+      const id = getActiveIdentity();
+      if (!id) return;
+      const goal = id.goals[gi];
+      const current = goal.milestone || '';
+      const date = prompt('截止日期（如：2026.8.1）：', current);
+      if (date !== null) {
+        goal.milestone = date;
+        save();
+        renderMain();
+        updateAiReminders();
+      }
+    }
+
+    function aiBreakSubGoal(gi, si) {
+      const id = getActiveIdentity();
+      if (!id) return;
+      const subGoal = id.goals[gi].subGoals[si];
+      const breakdowns = aiBreakdown(subGoal.text);
+      addAiMsg(`关于「${subGoal.text}」，建议完成以下步骤：`);
+      addAiMsg(`<p>${breakdowns.map(b => '• ' + b.text + (b.urgent?' 🔴':'')).join('<br>')}</p>`);
+
+      breakdowns.forEach(b => {
+        const exists = id.goals[gi].subGoals.find(s => s.text === b.text);
+        if (!exists) {
+          id.goals[gi].subGoals.push({ id: uid(), text: b.text, done: false });
+        }
+      });
+      save();
+      renderMain();
+    }
+
+    function saveIdentityVision() {
+      const id = getActiveIdentity();
+      if (!id) return;
+      id.vision = document.getElementById('visionInput').value;
+      save();
+    }
+
+    // ── Identity Actions ──
+    function addIdentity() {
+      const name = prompt('新身份名称（如：杜克留学生 / 携程实习生 / 秋招求职者）:');
+      if (!name || !name.trim()) return;
+      const desc = prompt('简短描述（可选）:', '');
+      const newId = uid();
+      const color = PHASE_COLORS[data.identities.length % PHASE_COLORS.length];
+      data.identities.push({ id: newId, name: name.trim(), desc: desc || '', color, vision: '', goals: [] });
+      data.activeIdentityId = newId;
+      save();
+      renderTabs();
+      renderMain();
+      updateAiContext();
+      updateDailyQuestion();
+      addAiMsg(`新身份【${name.trim()}】已添加！现在给它添加第一个大目标吧。我会自动帮你拆解成小目标。`);
+    }
+
+    function editIdentity(id) {
+      const obj = data.identities.find(i => i.id === id);
+      if (!obj) return;
+      const newName = prompt('重命名身份:', obj.name);
+      if (newName && newName.trim()) { obj.name = newName.trim(); save(); renderTabs(); renderMain(); updateAiContext(); }
+    }
+
+    function deleteIdentity(id) {
+      if (!confirm('删除这个身份？所有目标都会删除。')) return;
+      data.identities = data.identities.filter(i => i.id !== id);
+      if (data.activeIdentityId === id) data.activeIdentityId = data.identities[0]?.id || null;
+      save();
+      renderTabs();
+      renderMain();
+      updateAiContext();
+      updateDailyQuestion();
+    }
+
+    // ── Import ──
+    let importCache = { goals: [], text: '' };
+
+    function openImportModal() {
+      document.getElementById('importModal').style.display = 'flex';
+      importCache = { goals: [], text: '' };
+      document.getElementById('importPreview').style.display = 'none';
+      document.getElementById('importConfirmBtn').style.display = 'none';
+      document.getElementById('importResult').textContent = '';
+    }
+
+    function closeImportModal() {
+      document.getElementById('importModal').style.display = 'none';
+    }
+
+    function handleImportFile(event) {
+      const file = event.target.files[0];
+      if (!file) return;
+      const reader = new FileReader();
+      reader.onload = function(e) {
+        const text = e.target.result;
+        importCache.text = text;
+        document.getElementById('importPreview').style.display = 'block';
+        document.getElementById('importPreview').textContent = text.slice(0, 500) + (text.length > 500 ? '...' : '');
+        document.getElementById('importConfirmBtn').style.display = 'block';
+
+        // Simple AI parse: extract dates and events
+        const lines = text.split('\n').filter(l => l.trim());
+        const parsed = [];
+        const dateRegex = /(\d{1,4}[.\/\-]\d{1,2}[.\/\-]\d{0,4})/g;
+        lines.forEach(line => {
+          const trimmed = line.trim();
+          if (trimmed.length < 2) return;
+          const dates = trimmed.match(dateRegex);
+          if (dates) {
+            parsed.push({ text: trimmed, date: dates[0] });
+          } else if (trimmed.length > 3) {
+            parsed.push({ text: trimmed, date: '' });
+          }
+        });
+        importCache.goals = parsed;
+        document.getElementById('importResult').textContent =
+          parsed.length > 0
+            ? `✅ 识别到 ${parsed.length} 条内容：\n${parsed.slice(0,5).map(p => (p.date ? '['+p.date+'] ' : '') + p.text.slice(0,30)).join('\n')}${parsed.length > 5 ? '\n...还有 '+(parsed.length-5)+' 条' : ''}`
+            : '⚠️ 未识别到明确日期格式，请手动确认';
+      };
+      if (file.type === 'text/plain' || file.type === 'text/csv') {
+        reader.readAsText(file);
+      } else {
+        // For images/PDFs, we'd need OCR. For now, just show file name
+        document.getElementById('importPreview').style.display = 'block';
+        document.getElementById('importPreview').textContent = `[${file.name}]\n\n提示：PDF和图片需要OCR能力来提取文字。目前支持 TXT/CSV 文件直接导入。`;
+        document.getElementById('importConfirmBtn').style.display = 'block';
+        importCache.goals = [];
+      }
+    }
+
+    function confirmImport() {
+      const id = getActiveIdentity();
+      if (!id && data.identities.length > 0) {
+        data.activeIdentityId = data.identities[0].id;
+      }
+      if (!id) {
+        alert('请先添加一个身份，再导入日程。');
+        closeImportModal();
+        return;
+      }
+      const added = importCache.goals.filter(g => g.text.trim().length > 2);
+      added.forEach(g => {
+        if (!id.goals) id.goals = [];
+        id.goals.push({ id: uid(), text: g.text.slice(0,80), milestone: g.date, done: false, subGoals: [] });
+      });
+      save();
+      renderTabs();
+      renderMain();
+      updateAiContext();
+      closeImportModal();
+      addAiMsg(`已导入 ${added.length} 条目标到【${id.name}】，好好规划接下来的行动吧！`);
+      showToast('导入成功', `已添加 ${added.length} 条目标到当前身份`);
+    }
+
+    function handleImport(event) {
+      openImportModal();
+    }
+
+    // ── Toast ──
+    function showToast(title, body) {
+      const existing = document.querySelector('.toast');
+      if (existing) existing.remove();
+      const div = document.createElement('div');
+      div.className = 'toast';
+      div.innerHTML = `<div class="toast-title">${escHtml(title)}</div><div class="toast-body">${escHtml(body)}</div>`;
+      document.body.appendChild(div);
+      setTimeout(() => div.remove(), 5000);
+    }
+
+    // ── Seed Data ──
+    function seedData() {
+      if (data.identities.length > 0) return;
+
+      const id1 = uid(), id2 = uid(), id3 = uid();
+      data.activeIdentityId = id1;
+
+      data.identities = [
+        {
+          id: id1,
+          name: '杜克留学生',
+          desc: '2026 Fall · MSEM · Duke University',
+          color: '#C9A84C',
+          vision: '成为在可持续商业领域有深度洞察的专业人才，利用杜克的资源建立全球视野。',
+          goals: [
+            {
+              id: uid(), text: '完成赴美前全部准备', milestone: '2026.8.1', done: false,
+              subGoals: [
+                { id: uid(), text: 'I-20申请与签证完成', done: true },
+                { id: uid(), text: '体检和疫苗接种', done: false },
+                { id: uid(), text: '选课确认（至少3门必修）', done: false },
+                { id: uid(), text: '住宿安排确定', done: false },
+                { id: uid(), text: '中美往返机票购买', done: false }
+              ]
+            },
+            {
+              id: uid(), text: '适应杜克学术节奏', milestone: '2026.9.30', done: false,
+              subGoals: [
+                { id: uid(), text: '完成第一个月课程', done: false },
+                { id: uid(), text: '建立学习小组（找2-3个队友）', done: false },
+                { id: uid(), text: '第一次 office hour 拜访', done: false }
+              ]
+            },
+            {
+              id: uid(), text: '拓展人脉网络', milestone: '2026.12.31', done: false,
+              subGoals: [
+                { id: uid(), text: '参加2场校园招聘会', done: false },
+                { id: uid(), text: '连接10位同领域校友', done: false }
+              ]
+            }
+          ]
+        },
+        {
+          id: id2,
+          name: '秋招求职者',
+          desc: '2026届 · 产品经理方向',
+          color: '#7A6B8E',
+          vision: '找到一家产品和文化都契合的公司，从PM开始建立职业生涯。',
+          goals: [
+            {
+              id: uid(), text: '秋招申请完成30家公司', milestone: '2026.10.15', done: false,
+              subGoals: [
+                { id: uid(), text: '简历定稿', done: false },
+                { id: uid(), text: 'List 30家目标公司', done: false },
+                { id: uid(), text: '每天投递3家', done: false }
+              ]
+            },
+            {
+              id: uid(), text: '面试准备', milestone: '2026.11.30', done: false,
+              subGoals: [
+                { id: uid(), text: 'PM面试题库过一遍', done: false },
+                { id: uid(), text: '准备10个STAR故事', done: false },
+                { id: uid(), text: 'mock interview ×5', done: false }
+              ]
+            }
+          ]
+        },
+        {
+          id: id3,
+          name: '减脂中',
+          desc: '目标体重：52kg（当前约58kg）',
+          color: '#8E6B6B',
+          vision: '精力充沛，身体轻盈，用最好的状态面对每一天。',
+          goals: [
+            {
+              id: uid(), text: '6-8月达成52kg', milestone: '2026.8.31', done: false,
+              subGoals: [
+                { id: uid(), text: '每周运动3次（跑步/健身房）', done: false },
+                { id: uid(), text: '戒奶茶和甜食', done: true },
+                { id: uid(), text: '每天称重记录', done: false },
+                { id: uid(), text: '每周减0.5kg', done: false }
+              ]
+            }
+          ]
+        }
+      ];
+
+      save();
+    }
+
+    // ── Init ──
+    function init() {
+      seedData();
+      renderDate();
+      renderTabs();
+      renderMain();
+      updateAiContext();
+      updateDailyQuestion();
+      updateAiReminders();
+      setInterval(renderDate, 60000);
+    }
+
+    init();
+  </script>
+</body>
+</html>
