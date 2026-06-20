@@ -725,12 +725,76 @@
     </div>
   </div>
 
+  <!-- Schedule Wizard Modal -->
+  <div class="modal-overlay" id="scheduleWizardModal" style="display:none">
+    <div class="modal" style="position:relative;min-width:520px">
+      <button class="modal-close" onclick="closeScheduleWizard()">×</button>
+      <div class="modal-title" id="wizardTitle">生成目标计划</div>
+      <div class="modal-sub" id="wizardSub">告诉AI你在这个身份下的主要目标是什么？</div>
+      <div id="wizardContent">
+        <textarea id="wizardGoalInput" placeholder="例如：去杜克读硕士，毕业后在美国找工作" rows="3" style="width:100%;padding:10px;border:1px solid var(--border);border-radius:8px;font-size:13px;font-family:var(--font-body);resize:none;outline:none;color:var(--text)"></textarea>
+      </div>
+      <div id="wizardPreview" style="display:none;margin-top:16px;max-height:300px;overflow-y:auto"></div>
+      <div style="display:flex;gap:8px;margin-top:16px">
+        <button class="modal-import-btn" id="wizardNextBtn" onclick="scheduleWizardNext()" style="flex:1">生成计划</button>
+        <button class="modal-import-btn" id="wizardBackBtn" onclick="scheduleWizardBack()" style="display:none">上一步</button>
+      </div>
+    </div>
+  </div>
+
   <script>
     // ── Store ──
     const STORE = 'perform_v1';
     let data = load();
 
     const PHASE_COLORS = ['#C9A84C','#8B7355','#6B8E6B','#7A6B8E','#8E6B6B','#6B8E8E','#8E8E6B','#6B7A8E'];
+
+    // Phase templates knowledge base for schedule generation
+    const PHASE_TEMPLATES = {
+      '留学生': {
+        keywords: ['留学', '留学生', '入学', '读书', '硕士', '博士', '大学', 'college', 'university', 'student', ' duke', 'duke', '出國'],
+        phases: [
+          { name: '行前准备', duration: 0.25, tasks: ['办理护照/签证', '预约体检/疫苗', '购买保险', '申请信用卡', '租房/接机', '预订机票', '打包行李', '学校注册'] },
+          { name: '抵达安顿', duration: 0.15, tasks: ['开通银行账户', '开通手机卡', '熟悉校园', '购买生活用品', '认识新朋友'] },
+          { name: '学术适应', duration: 0.35, tasks: ['选课', '购买课本', '适应教学风格', '建立学习习惯', '参与group work', 'Office hours'] },
+          { name: '生活融入', duration: 0.25, tasks: ['探索周边', '尝试当地美食', '加入社团', 'Networking', '实习准备', '假期旅行'] }
+        ]
+      },
+      '求职者': {
+        keywords: ['求职', '秋招', '春招', '找工作', '面试', 'offer', 'recruit', 'job', 'career', '春招', '社招'],
+        phases: [
+          { name: '简历准备', duration: 0.15, tasks: ['更新简历', '准备作品集', 'LinkedIn优化', '猎聘/Boss直聘主页', '个人名片'] },
+          { name: '信息收集', duration: 0.2, tasks: ['确定目标公司', '研究公司/岗位', '联系校友/内推', '参加宣讲会', '关注招聘日程'] },
+          { name: '笔试面试', duration: 0.45, tasks: ['刷算法题', '准备STAR法则', '模拟面试', '参加笔试', '参加面试', '复盘总结'] },
+          { name: 'Offer决策', duration: 0.2, tasks: ['比较Offer', '谈薪资', '背景调查', '签三方', '处理违约金'] }
+        ]
+      },
+      '职场新人': {
+        keywords: ['入职', '转正', '职场', '工作', '新人', 'employee', 'onboard', '实习', 'intern'],
+        phases: [
+          { name: '入职适应', duration: 0.2, tasks: ['熟悉公司文化', '认识同事', '配置工作环境', '阅读入职文档', '开通权限'] },
+          { name: '学习成长', duration: 0.5, tasks: ['完成培训', '学习内部工具', '承担小任务', '寻求反馈', '记录问题', '主动汇报'] },
+          { name: '融入团队', duration: 0.3, tasks: ['1v1 meeting', '主动沟通', '参与团队活动', '建立信任', '展示能力'] }
+        ]
+      },
+      '减脂/健身': {
+        keywords: ['减脂', '健身', '减肥', '瘦身', 'weight', 'diet', 'fitness', 'gym', '增肌', '跑步', '运动'],
+        phases: [
+          { name: '习惯养成', duration: 0.3, tasks: ['调整饮食结构', '记录饮食', '开始运动', '保证睡眠', '买健身装备'] },
+          { name: '持续执行', duration: 0.5, tasks: ['每周3-4次运动', '控制碳水摄入', '多喝水', '记录体重', '定期拍照'] },
+          { name: '巩固维持', duration: 0.2, tasks: ['形成习惯', '偶尔放松', '长期维持', '防止反弹'] }
+        ]
+      },
+      '创业者': {
+        keywords: ['创业', 'startup', '融资', '产品', 'ceo', '-founder'],
+        phases: [
+          { name: 'Idea验证', duration: 0.2, tasks: ['市场调研', '用户访谈', 'MVP开发', '获取首批用户'] },
+          { name: '产品打磨', duration: 0.35, tasks: ['收集反馈', '迭代产品', '优化体验', '增长用户'] },
+          { name: '融资准备', duration: 0.25, tasks: ['准备BP', '联系投资人', '路演', 'Due Diligence'] },
+          { name: '团队扩张', duration: 0.2, tasks: ['招聘', '文化建设', '流程建立', '里程碑达成'] }
+        ]
+      }
+    };
 
     const DAILY_QUESTIONS = [
       '今天，你为「{identity}」做了什么？',
@@ -1533,6 +1597,203 @@
       updateAiContext();
       updateAiReminders();
       addAiMsg(`【${obj.name}】时间段已更新：${startDate} - ${endDate}`);
+      // Open schedule wizard after setting date range
+      openScheduleWizard(obj.id);
+    }
+
+    // ── Schedule Wizard ──
+    let scheduleWizardState = { step: 0, identityId: null, goal: '', schedule: null };
+
+    function openScheduleWizard(id) {
+      scheduleWizardState = { step: 0, identityId: id, goal: '', schedule: null };
+      document.getElementById('wizardTitle').textContent = '生成目标计划';
+      document.getElementById('wizardSub').textContent = '告诉AI你在这个身份下的主要目标是什么？';
+      document.getElementById('wizardGoalInput').style.display = 'block';
+      document.getElementById('wizardGoalInput').value = '';
+      document.getElementById('wizardPreview').style.display = 'none';
+      document.getElementById('wizardNextBtn').textContent = '生成计划';
+      document.getElementById('wizardBackBtn').style.display = 'none';
+      document.getElementById('scheduleWizardModal').style.display = 'flex';
+    }
+
+    function closeScheduleWizard() {
+      document.getElementById('scheduleWizardModal').style.display = 'none';
+      scheduleWizardState = { step: 0, identityId: null, goal: '', schedule: null };
+    }
+
+    function scheduleWizardNext() {
+      const state = scheduleWizardState;
+
+      if (state.step === 0) {
+        // Get user input and generate schedule
+        const goalText = document.getElementById('wizardGoalInput').value.trim();
+        if (!goalText) {
+          alert('请输入你的主要目标');
+          return;
+        }
+        state.goal = goalText;
+        state.schedule = generateScheduleFromAI(state.identityId, goalText);
+        state.step = 1;
+
+        // Show preview
+        document.getElementById('wizardTitle').textContent = '预览目标计划';
+        document.getElementById('wizardSub').textContent = '以下是AI为你生成的目标计划，可以调整或确认';
+        document.getElementById('wizardGoalInput').style.display = 'none';
+        document.getElementById('wizardNextBtn').textContent = '确认应用';
+        document.getElementById('wizardBackBtn').style.display = 'block';
+
+        // Render preview
+        const preview = document.getElementById('wizardPreview');
+        preview.style.display = 'block';
+        preview.innerHTML = state.schedule.map(g => `
+          <div style="margin-bottom:12px;padding:10px;background:var(--surface);border-radius:8px">
+            <div style="display:flex;align-items:center;gap:8px;margin-bottom:6px">
+              <span style="font-weight:500">${escHtml(g.text)}</span>
+              <span style="font-family:var(--font-mono);font-size:10px;color:var(--gold)">${escHtml(g.milestone)}</span>
+            </div>
+            ${g.subGoals.map(s => `
+              <div style="display:flex;align-items:center;gap:8px;padding:4px 0 4px 20px;font-size:12px;color:var(--text-sec)">
+                <span>└</span>
+                <span>${escHtml(s.text)}</span>
+                <span style="font-family:var(--font-mono);font-size:10px;color:var(--text-muted)">${escHtml(s.milestone)}</span>
+              </div>
+            `).join('')}
+          </div>
+        `).join('');
+
+      } else if (state.step === 1) {
+        // Apply schedule
+        applyGeneratedSchedule(state.schedule, state.identityId);
+        closeScheduleWizard();
+      }
+    }
+
+    function scheduleWizardBack() {
+      const state = scheduleWizardState;
+      if (state.step === 1) {
+        state.step = 0;
+        state.schedule = null;
+        document.getElementById('wizardTitle').textContent = '生成目标计划';
+        document.getElementById('wizardSub').textContent = '告诉AI你在这个身份下的主要目标是什么？';
+        document.getElementById('wizardGoalInput').style.display = 'block';
+        document.getElementById('wizardPreview').style.display = 'none';
+        document.getElementById('wizardNextBtn').textContent = '生成计划';
+        document.getElementById('wizardBackBtn').style.display = 'none';
+      }
+    }
+
+    function generateScheduleFromAI(identityId, goalText) {
+      const identity = data.identities.find(i => i.id === identityId);
+      if (!identity) return [];
+
+      const startDate = identity.startDate;
+      const endDate = identity.endDate;
+
+      // Parse dates
+      const parseD = (d) => { if (!d) return null; const p = d.split('.'); return p.length >= 3 ? new Date(parseInt(p[0]), parseInt(p[1])-1, parseInt(p[2])) : null; };
+      const startD = parseD(startDate);
+      const endD = parseD(endDate);
+
+      if (!startD || !endD) return [];
+
+      const totalDays = (endD - startD) / (1000 * 60 * 60 * 24);
+      const lowerGoal = goalText.toLowerCase();
+
+      // Detect phase type
+      let matchedType = null;
+      let maxKeywords = 0;
+      for (const [type, template] of Object.entries(PHASE_TEMPLATES)) {
+        let keywordsMatched = 0;
+        for (const kw of template.keywords) {
+          if (lowerGoal.includes(kw.toLowerCase()) || lowerGoal.includes(kw)) {
+            keywordsMatched++;
+          }
+        }
+        if (keywordsMatched > maxKeywords) {
+          maxKeywords = keywordsMatched;
+          matchedType = type;
+        }
+      }
+
+      // If no match, use generic phases
+      if (!matchedType || maxKeywords === 0) {
+        matchedType = '通用';
+        PHASE_TEMPLATES['通用'] = {
+          phases: [
+            { name: '第一阶段', duration: 0.33, tasks: ['确定目标', '制定计划', '开始行动'] },
+            { name: '第二阶段', duration: 0.34, tasks: ['执行计划', '监控进度', '解决问题'] },
+            { name: '第三阶段', duration: 0.33, tasks: ['完成目标', '总结复盘', '巩固成果'] }
+          ]
+        };
+      }
+
+      const template = PHASE_TEMPLATES[matchedType];
+      const schedule = [];
+
+      let currentDate = new Date(startD);
+      template.phases.forEach((phase, pi) => {
+        const phaseDays = Math.round(totalDays * phase.duration);
+        const phaseEndDate = new Date(currentDate.getTime() + phaseDays * 24 * 60 * 60 * 1000);
+
+        // Format date as YYYY.M.D
+        const fmtDate = (d) => `${d.getFullYear()}.${d.getMonth()+1}.${d.getDate()}`;
+
+        const goal = {
+          text: phase.name,
+          milestone: fmtDate(phaseEndDate),
+          subGoals: []
+        };
+
+        // Distribute subGoals evenly within phase
+        phase.tasks.forEach((task, ti) => {
+          const taskRatio = phase.tasks.length <= 1 ? 0.5 : ti / (phase.tasks.length - 1);
+          const taskDate = new Date(currentDate.getTime() + Math.round(taskRatio * phaseDays) * 24 * 60 * 60 * 1000);
+          goal.subGoals.push({
+            text: task,
+            milestone: fmtDate(taskDate),
+            done: false
+          });
+        });
+
+        schedule.push(goal);
+        currentDate = new Date(phaseEndDate.getTime() + 24 * 60 * 60 * 1000); // Start next phase day after
+      });
+
+      return schedule;
+    }
+
+    function applyGeneratedSchedule(schedule, identityId) {
+      const identity = data.identities.find(i => i.id === identityId);
+      if (!identity || !schedule) return;
+
+      const parseD = (d) => { if (!d) return null; const p = d.split('.'); return p.length >= 3 ? new Date(parseInt(p[0]), parseInt(p[1])-1, parseInt(p[2])) : null; };
+
+      schedule.forEach(g => {
+        const goalId = uid();
+        const goal = {
+          id: goalId,
+          text: g.text,
+          milestone: g.milestone,
+          done: false,
+          subGoals: []
+        };
+
+        (g.subGoals || []).forEach(s => {
+          goal.subGoals.push({
+            id: uid(),
+            text: s.text,
+            milestone: s.milestone,
+            done: false
+          });
+        });
+
+        identity.goals.push(goal);
+      });
+
+      save();
+      renderMain();
+      updateAiReminders();
+      addAiMsg(`【${identity.name}】已生成 ${schedule.length} 个大目标和若干子目标，请确认是否需要调整！`);
     }
 
     function handleImportFile(event) {
