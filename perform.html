@@ -86,6 +86,13 @@
     .identity-tab:hover { color: var(--text); background: var(--gold-glow); }
     .identity-tab.active { border-color: var(--gold); color: var(--gold); background: var(--gold-dim); }
     .identity-tab-dot { width: 7px; height: 7px; border-radius: 50%; flex-shrink: 0; }
+    .identity-tab-deadline {
+      font-family: var(--font-mono);
+      font-size: 9px;
+      color: var(--text-muted);
+      margin-left: 2px;
+    }
+    .identity-tab.active .identity-tab-deadline { color: var(--gold); }
     .topbar-right { display: flex; align-items: center; gap: 10px; flex-shrink: 0; }
     .topbar-date { font-family: var(--font-mono); font-size: 11px; color: var(--text-sec); text-align: right; line-height: 1.7; }
     .topbar-add-btn {
@@ -822,8 +829,9 @@
 
     function updateAiContext() {
       const id = getActiveIdentity();
+      const deadlineStr = id && id.deadline ? ` | 截止 ${id.deadline}` : '';
       document.getElementById('aiContextLabel').textContent =
-        id ? `当前：${id.name}` : '了解你所有的身份和目标...';
+        id ? `当前：${id.name}${deadlineStr}` : '了解你所有的身份和目标...';
     }
 
     function updateAiReminders() {
@@ -898,6 +906,7 @@
         <button class="identity-tab ${id.id === data.activeIdentityId ? 'active' : ''}" onclick="selectIdentity(${id.id})">
           <span class="identity-tab-dot" style="background:${id.color||'#C9A84C'}"></span>
           ${escHtml(id.name)}
+          ${id.deadline ? `<span class="identity-tab-deadline">· ${escHtml(id.deadline)}</span>` : ''}
         </button>
       `).join('');
     }
@@ -933,11 +942,13 @@
           <div class="identity-header-top">
             <div class="identity-name" style="color:${id.color||'var(--text)'}">${escHtml(id.name)}</div>
             <div class="identity-header-actions">
+              <button class="icon-btn" onclick="setIdentityDeadline(${id.id})">📅 ${id.deadline ? id.deadline : '设置截止'}</button>
               <button class="icon-btn" onclick="editIdentity(${id.id})">✎ 重命名</button>
               <button class="icon-btn danger" onclick="deleteIdentity(${id.id})">× 删除</button>
             </div>
           </div>
           ${id.desc ? `<div class="identity-desc">${escHtml(id.desc)}</div>` : ''}
+          ${id.deadline ? `<div class="identity-deadline" style="font-family:var(--font-mono);font-size:11px;color:var(--text-muted);margin-bottom:12px">⏱ 截止：${escHtml(id.deadline)}</div>` : ''}
         </div>
 
         <!-- Vision -->
@@ -1230,16 +1241,17 @@
       const name = prompt('新身份名称（如：杜克留学生 / 携程实习生 / 秋招求职者）:');
       if (!name || !name.trim()) return;
       const desc = prompt('简短描述（可选）:', '');
+      const deadline = prompt('身份截止日期（如：2026.8.1，留空则无期限）:', '');
       const newId = uid();
       const color = PHASE_COLORS[data.identities.length % PHASE_COLORS.length];
-      data.identities.push({ id: newId, name: name.trim(), desc: desc || '', color, vision: '', goals: [] });
+      data.identities.push({ id: newId, name: name.trim(), desc: desc || '', deadline: deadline || '', color, vision: '', goals: [] });
       data.activeIdentityId = newId;
       save();
       renderTabs();
       renderMain();
       updateAiContext();
       updateDailyQuestion();
-      addAiMsg(`新身份【${name.trim()}】已添加！现在给它添加第一个大目标吧。我会自动帮你拆解成小目标。`);
+      addAiMsg(`新身份【${name.trim()}】已添加！截止日期：${deadline || '无期限'}。现在给它添加第一个大目标吧。`);
     }
 
     function editIdentity(id) {
@@ -1247,6 +1259,33 @@
       if (!obj) return;
       const newName = prompt('重命名身份:', obj.name);
       if (newName && newName.trim()) { obj.name = newName.trim(); save(); renderTabs(); renderMain(); updateAiContext(); }
+    }
+
+    function setIdentityDeadline(id) {
+      const obj = data.identities.find(i => i.id === id);
+      if (!obj) return;
+      const current = obj.deadline || '';
+      const deadline = prompt('身份截止日期（如：2026.8.1，留空则无期限）:', current);
+      if (deadline !== null) {
+        const oldDeadline = obj.deadline;
+        obj.deadline = deadline || '';
+        // Adjust all goal milestones based on the new deadline
+        if (oldDeadline && obj.deadline && obj.goals) {
+          const offset = parseDateOffset(oldDeadline, obj.deadline);
+          if (offset !== 0) {
+            obj.goals.forEach(g => {
+              if (g.milestone) g.milestone = adjustDate(g.milestone, offset);
+              (g.subGoals || []).forEach(s => {
+                if (s.milestone) s.milestone = adjustDate(s.milestone, offset);
+              });
+            });
+          }
+        }
+        save();
+        renderTabs();
+        renderMain();
+        updateAiReminders();
+      }
     }
 
     function deleteIdentity(id) {
