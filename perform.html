@@ -86,14 +86,38 @@
     .identity-tab:hover { color: var(--text); background: var(--gold-glow); }
     .identity-tab.active { border-color: var(--gold); color: var(--gold); background: var(--gold-dim); }
     .identity-tab-dot { width: 7px; height: 7px; border-radius: 50%; flex-shrink: 0; }
-    .identity-tab-deadline {
+    .identity-tab-range {
       font-family: var(--font-mono);
       font-size: 9px;
       color: var(--text-muted);
       margin-left: 2px;
     }
-    .identity-tab.active .identity-tab-deadline { color: var(--gold); }
+    .identity-tab.active .identity-tab-range { color: var(--gold); }
     .topbar-right { display: flex; align-items: center; gap: 10px; flex-shrink: 0; }
+
+    /* Date range picker */
+    .date-range-picker {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding: 10px 14px;
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      margin-bottom: 12px;
+    }
+    .date-range-picker select {
+      padding: 4px 8px;
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      background: var(--surface);
+      font-family: var(--font-mono);
+      font-size: 12px;
+      color: var(--text);
+      cursor: pointer;
+    }
+    .date-range-picker select:focus { outline: none; border-color: var(--gold); }
+    .date-range-sep { color: var(--text-muted); font-size: 12px; }
     .topbar-date { font-family: var(--font-mono); font-size: 11px; color: var(--text-sec); text-align: right; line-height: 1.7; }
     .topbar-add-btn {
       display: flex;
@@ -667,6 +691,40 @@
     </div>
   </div>
 
+  <!-- Date Range Picker Modal -->
+  <div class="modal-overlay" id="dateRangeModal" style="display:none">
+    <div class="modal" style="position:relative;min-width:320px">
+      <button class="modal-close" onclick="closeDateRangeModal()">×</button>
+      <div class="modal-title">设置身份时间段</div>
+      <div class="modal-sub">选择这个身份的开始和结束日期</div>
+      <div style="display:flex;gap:20px;margin-top:16px">
+        <div>
+          <div style="font-size:11px;color:var(--text-muted);margin-bottom:6px">开始日期</div>
+          <div class="date-range-picker" style="margin-bottom:0">
+            <select id="dpStartYear"></select>
+            <span style="color:var(--text-muted)">年</span>
+            <select id="dpStartMonth"></select>
+            <span style="color:var(--text-muted)">月</span>
+            <select id="dpStartDay"></select>
+            <span style="color:var(--text-muted)">日</span>
+          </div>
+        </div>
+        <div>
+          <div style="font-size:11px;color:var(--text-muted);margin-bottom:6px">结束日期</div>
+          <div class="date-range-picker" style="margin-bottom:0">
+            <select id="dpEndYear"></select>
+            <span style="color:var(--text-muted)">年</span>
+            <select id="dpEndMonth"></select>
+            <span style="color:var(--text-muted)">月</span>
+            <select id="dpEndDay"></select>
+            <span style="color:var(--text-muted)">日</span>
+          </div>
+        </div>
+      </div>
+      <button class="modal-import-btn" onclick="confirmDateRange()" style="margin-top:16px;width:100%">确认</button>
+    </div>
+  </div>
+
   <script>
     // ── Store ──
     const STORE = 'perform_v1';
@@ -829,9 +887,9 @@
 
     function updateAiContext() {
       const id = getActiveIdentity();
-      const deadlineStr = id && id.deadline ? ` | 截止 ${id.deadline}` : '';
+      const rangeStr = id && id.startDate && id.endDate ? ` | ${id.startDate} - ${id.endDate}` : '';
       document.getElementById('aiContextLabel').textContent =
-        id ? `当前：${id.name}${deadlineStr}` : '了解你所有的身份和目标...';
+        id ? `当前：${id.name}${rangeStr}` : '了解你所有的身份和目标...';
     }
 
     function updateAiReminders() {
@@ -902,13 +960,15 @@
     // ── Render Tabs ──
     function renderTabs() {
       const tabs = document.getElementById('identityTabs');
-      tabs.innerHTML = data.identities.map(id => `
+      tabs.innerHTML = data.identities.map(id => {
+        const rangeStr = (id.startDate && id.endDate) ? `${id.startDate} - ${id.endDate}` : (id.endDate ? `至 ${id.endDate}` : '');
+        return `
         <button class="identity-tab ${id.id === data.activeIdentityId ? 'active' : ''}" onclick="selectIdentity(${id.id})">
           <span class="identity-tab-dot" style="background:${id.color||'#C9A84C'}"></span>
           ${escHtml(id.name)}
-          ${id.deadline ? `<span class="identity-tab-deadline">· ${escHtml(id.deadline)}</span>` : ''}
+          ${rangeStr ? `<span class="identity-tab-range">· ${rangeStr}</span>` : ''}
         </button>
-      `).join('');
+      `}).join('');
     }
 
     function selectIdentity(id) {
@@ -942,13 +1002,13 @@
           <div class="identity-header-top">
             <div class="identity-name" style="color:${id.color||'var(--text)'}">${escHtml(id.name)}</div>
             <div class="identity-header-actions">
-              <button class="icon-btn" onclick="setIdentityDeadline(${id.id})">📅 ${id.deadline ? id.deadline : '设置截止'}</button>
+              <button class="icon-btn" onclick="openDateRangeModal(${id.id})">📅 ${id.startDate && id.endDate ? `${id.startDate} - ${id.endDate}` : '设置时间'}</button>
               <button class="icon-btn" onclick="editIdentity(${id.id})">✎ 重命名</button>
               <button class="icon-btn danger" onclick="deleteIdentity(${id.id})">× 删除</button>
             </div>
           </div>
           ${id.desc ? `<div class="identity-desc">${escHtml(id.desc)}</div>` : ''}
-          ${id.deadline ? `<div class="identity-deadline" style="font-family:var(--font-mono);font-size:11px;color:var(--text-muted);margin-bottom:12px">⏱ 截止：${escHtml(id.deadline)}</div>` : ''}
+          ${id.startDate && id.endDate ? `<div style="font-family:var(--font-mono);font-size:11px;color:var(--text-muted);margin-bottom:12px">⏱ ${escHtml(id.startDate)} → ${escHtml(id.endDate)}</div>` : ''}
         </div>
 
         <!-- Vision -->
@@ -1241,17 +1301,19 @@
       const name = prompt('新身份名称（如：杜克留学生 / 携程实习生 / 秋招求职者）:');
       if (!name || !name.trim()) return;
       const desc = prompt('简短描述（可选）:', '');
-      const deadline = prompt('身份截止日期（如：2026.8.1，留空则无期限）:', '');
       const newId = uid();
       const color = PHASE_COLORS[data.identities.length % PHASE_COLORS.length];
-      data.identities.push({ id: newId, name: name.trim(), desc: desc || '', deadline: deadline || '', color, vision: '', goals: [] });
+      const now = new Date();
+      const defaultStart = `${now.getFullYear()}.${now.getMonth()+1}.${now.getDate()}`;
+      const defaultEnd = `${now.getFullYear()}.${now.getMonth()+1}.${now.getDate()}`;
+      data.identities.push({ id: newId, name: name.trim(), desc: desc || '', startDate: defaultStart, endDate: defaultEnd, color, vision: '', goals: [] });
       data.activeIdentityId = newId;
       save();
       renderTabs();
       renderMain();
       updateAiContext();
-      updateDailyQuestion();
-      addAiMsg(`新身份【${name.trim()}】已添加！截止日期：${deadline || '无期限'}。现在给它添加第一个大目标吧。`);
+      // Open date range picker immediately
+      openDateRangeModal(newId);
     }
 
     function editIdentity(id) {
@@ -1259,33 +1321,6 @@
       if (!obj) return;
       const newName = prompt('重命名身份:', obj.name);
       if (newName && newName.trim()) { obj.name = newName.trim(); save(); renderTabs(); renderMain(); updateAiContext(); }
-    }
-
-    function setIdentityDeadline(id) {
-      const obj = data.identities.find(i => i.id === id);
-      if (!obj) return;
-      const current = obj.deadline || '';
-      const deadline = prompt('身份截止日期（如：2026.8.1，留空则无期限）:', current);
-      if (deadline !== null) {
-        const oldDeadline = obj.deadline;
-        obj.deadline = deadline || '';
-        // Adjust all goal milestones based on the new deadline
-        if (oldDeadline && obj.deadline && obj.goals) {
-          const offset = parseDateOffset(oldDeadline, obj.deadline);
-          if (offset !== 0) {
-            obj.goals.forEach(g => {
-              if (g.milestone) g.milestone = adjustDate(g.milestone, offset);
-              (g.subGoals || []).forEach(s => {
-                if (s.milestone) s.milestone = adjustDate(s.milestone, offset);
-              });
-            });
-          }
-        }
-        save();
-        renderTabs();
-        renderMain();
-        updateAiReminders();
-      }
     }
 
     function deleteIdentity(id) {
@@ -1312,6 +1347,172 @@
 
     function closeImportModal() {
       document.getElementById('importModal').style.display = 'none';
+    }
+
+    // ── Date Range Picker ──
+    let currentDateRangeIdentityId = null;
+
+    function openDateRangeModal(id) {
+      currentDateRangeIdentityId = id;
+      const obj = data.identities.find(i => i.id === id);
+      if (!obj) return;
+
+      const now = new Date();
+      const currentYear = now.getFullYear();
+
+      // Populate year selects (10 years range)
+      const startYear = document.getElementById('dpStartYear');
+      const endYear = document.getElementById('dpEndYear');
+      startYear.innerHTML = endYear.innerHTML = '';
+      for (let y = currentYear - 2; y <= currentYear + 10; y++) {
+        startYear.innerHTML += `<option value="${y}">${y}</option>`;
+        endYear.innerHTML += `<option value="${y}">${y}</option>`;
+      }
+
+      // Populate month selects
+      const startMonth = document.getElementById('dpStartMonth');
+      const endMonth = document.getElementById('dpEndMonth');
+      startMonth.innerHTML = endMonth.innerHTML = '';
+      for (let m = 1; m <= 12; m++) {
+        const sm = String(m).padStart(2, '0');
+        startMonth.innerHTML += `<option value="${sm}">${sm}</option>`;
+        endMonth.innerHTML += `<option value="${sm}">${sm}</option>`;
+      }
+
+      // Set current values or defaults
+      const parseDateParts = (d) => {
+        if (!d) return null;
+        const parts = d.split('.');
+        return parts.length >= 3 ? { year: parseInt(parts[0]), month: parseInt(parts[1]), day: parseInt(parts[2]) } : null;
+      };
+
+      const startParts = parseDateParts(obj.startDate);
+      const endParts = parseDateParts(obj.endDate);
+
+      if (startParts) {
+        startYear.value = startParts.year;
+        startMonth.value = String(startParts.month).padStart(2, '0');
+        updateDaySelect('dpStartDay', startParts.year, startParts.month);
+        document.getElementById('dpStartDay').value = String(startParts.day).padStart(2, '0');
+      } else {
+        startYear.value = currentYear;
+        startMonth.value = String(now.getMonth() + 1).padStart(2, '0');
+        updateDaySelect('dpStartDay', currentYear, now.getMonth() + 1);
+        document.getElementById('dpStartDay').value = String(now.getDate()).padStart(2, '0');
+      }
+
+      if (endParts) {
+        endYear.value = endParts.year;
+        endMonth.value = String(endParts.month).padStart(2, '0');
+        updateDaySelect('dpEndDay', endParts.year, endParts.month);
+        document.getElementById('dpEndDay').value = String(endParts.day).padStart(2, '0');
+      } else {
+        endYear.value = currentYear;
+        endMonth.value = String(now.getMonth() + 1).padStart(2, '0');
+        updateDaySelect('dpEndDay', currentYear, now.getMonth() + 1);
+        document.getElementById('dpEndDay').value = String(now.getDate()).padStart(2, '0');
+      }
+
+      // Add change listeners for cascading
+      startYear.onchange = () => updateDaySelect('dpStartDay', startYear.value, startMonth.value);
+      startMonth.onchange = () => updateDaySelect('dpStartDay', startYear.value, startMonth.value);
+      endYear.onchange = () => updateDaySelect('dpEndDay', endYear.value, endMonth.value);
+      endMonth.onchange = () => updateDaySelect('dpEndDay', endYear.value, endMonth.value);
+
+      document.getElementById('dateRangeModal').style.display = 'flex';
+    }
+
+    function updateDaySelect(selectId, year, month) {
+      const select = document.getElementById(selectId);
+      const daysInMonth = new Date(year, month, 0).getDate();
+      const currentVal = select.value ? parseInt(select.value) : 1;
+      select.innerHTML = '';
+      for (let d = 1; d <= daysInMonth; d++) {
+        select.innerHTML += `<option value="${String(d).padStart(2, '0')}">${String(d).padStart(2, '0')}</option>`;
+      }
+      select.value = String(Math.min(currentVal, daysInMonth)).padStart(2, '0');
+    }
+
+    function closeDateRangeModal() {
+      document.getElementById('dateRangeModal').style.display = 'none';
+      currentDateRangeIdentityId = null;
+    }
+
+    function confirmDateRange() {
+      if (!currentDateRangeIdentityId) return;
+      const obj = data.identities.find(i => i.id === currentDateRangeIdentityId);
+      if (!obj) return;
+
+      const startDate = `${document.getElementById('dpStartYear').value}.${document.getElementById('dpStartMonth').value}.${document.getElementById('dpStartDay').value}`;
+      const endDate = `${document.getElementById('dpEndYear').value}.${document.getElementById('dpEndMonth').value}.${document.getElementById('dpEndDay').value}`;
+
+      const oldStart = obj.startDate;
+      const oldEnd = obj.endDate;
+
+      obj.startDate = startDate;
+      obj.endDate = endDate;
+
+      // Adjust all goal milestones if the range shifted
+      if ((oldStart && oldEnd) || (startDate && endDate)) {
+        // Calculate total days in old vs new range
+        const parseD = (d) => { if (!d) return null; const p = d.split('.'); return p.length >= 3 ? new Date(parseInt(p[0]), parseInt(p[1])-1, parseInt(p[2])) : null; };
+        const oldStartD = parseD(oldStart);
+        const oldEndD = parseD(oldEnd);
+        const newStartD = parseD(startDate);
+        const newEndD = parseD(endDate);
+
+        if (oldStartD && oldEndD && newStartD && newEndD) {
+          const oldTotal = (oldEndD - oldStartD) / (1000 * 60 * 60 * 24);
+          const newTotal = (newEndD - newStartD) / (1000 * 60 * 60 * 24);
+
+          obj.goals.forEach(g => {
+            if (g.milestone) {
+              const gDate = parseD(g.milestone);
+              if (gDate) {
+                // Map old position to new position
+                const oldPos = (gDate - oldStartD) / (1000 * 60 * 60 * 24);
+                const ratio = oldPos / oldTotal;
+                const newPos = Math.round(ratio * newTotal);
+                const newDateMs = newStartD.getTime() + newPos * 24 * 60 * 60 * 1000;
+                const nd = new Date(newDateMs);
+                g.milestone = `${nd.getFullYear()}.${nd.getMonth()+1}.${nd.getDate()}`;
+              }
+            }
+            (g.subGoals || []).forEach(s => {
+              if (s.milestone) {
+                const sDate = parseD(s.milestone);
+                if (sDate) {
+                  const oldPos = (sDate - oldStartD) / (1000 * 60 * 60 * 24);
+                  const ratio = oldPos / oldTotal;
+                  const newPos = Math.round(ratio * newTotal);
+                  const newDateMs = newStartD.getTime() + newPos * 24 * 60 * 60 * 1000;
+                  const nd = new Date(newDateMs);
+                  s.milestone = `${nd.getFullYear()}.${nd.getMonth()+1}.${nd.getDate()}`;
+                }
+              }
+            });
+          });
+        } else if (oldStart && !oldEnd && newStartD && newEndD) {
+          // New range was set, proportionally distribute milestones
+          obj.goals.forEach((g, gi) => {
+            if (g.milestone) {
+              const ratio = gi / Math.max(1, obj.goals.length - 1);
+              const daysOffset = Math.round(ratio * ((newEndD - newStartD) / (1000 * 60 * 60 * 24)));
+              const newDateMs = newStartD.getTime() + daysOffset * 24 * 60 * 60 * 1000;
+              const nd = new Date(newDateMs);
+              g.milestone = `${nd.getFullYear()}.${nd.getMonth()+1}.${nd.getDate()}`;
+            }
+          });
+        }
+      }
+
+      save();
+      closeDateRangeModal();
+      renderTabs();
+      renderMain();
+      updateAiContext();
+      updateAiReminders();
+      addAiMsg(`【${obj.name}】时间段已更新：${startDate} - ${endDate}`);
     }
 
     function handleImportFile(event) {
