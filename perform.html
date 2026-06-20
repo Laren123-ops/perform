@@ -286,6 +286,16 @@
     }
     .sub-goal-item:hover .sub-goal-ai { opacity: 1; }
     .sub-goal-ai:hover { background: var(--gold-dim); }
+    .sub-goal-date {
+      font-family: var(--font-mono);
+      font-size: 9px;
+      color: var(--text-muted);
+      margin-left: auto;
+      cursor: pointer;
+      padding: 2px 5px;
+      border-radius: 3px;
+    }
+    .sub-goal-date:hover { background: var(--gold-dim); color: var(--gold); }
 
     /* Add Goal */
     .add-goal-row {
@@ -983,6 +993,7 @@
                 <div class="sub-goal-item ${s.done ? 'done' : ''}">
                   <div class="sub-goal-check" onclick="toggleSubGoalDone(${gi}, ${si})"></div>
                   <span class="sub-goal-text">${escHtml(s.text)}</span>
+                  ${s.milestone ? `<span class="sub-goal-date" onclick="event.stopPropagation();setSubGoalMilestone(${gi}, ${si})">📅 ${escHtml(s.milestone)}</span>` : `<span class="sub-goal-date" onclick="event.stopPropagation();setSubGoalMilestone(${gi}, ${si})">+日期</span>`}
                   <span class="sub-goal-ai" onclick="event.stopPropagation();aiBreakSubGoal(${gi}, ${si})" title="AI拆解">✨</span>
                   <button class="goal-action-btn del" style="opacity:0" onmouseover="this.style.opacity=1" onmouseout="this.style.opacity=0" onclick="event.stopPropagation();deleteSubGoal(${gi},${si})">×</button>
                 </div>
@@ -1070,7 +1081,17 @@
       const text = prompt('子目标内容：');
       if (!text || !text.trim()) return;
       if (!id.goals[gi].subGoals) id.goals[gi].subGoals = [];
-      id.goals[gi].subGoals.push({ id: uid(), text: text.trim(), done: false });
+      const parentGoal = id.goals[gi];
+      // Auto-set milestone based on parent, a few days after parent
+      let subMilestone = '';
+      if (parentGoal.milestone) {
+        const parentDate = parseDate(parentGoal.milestone);
+        if (parentDate) {
+          parentDate.setDate(parentDate.getDate() + 3); // Default: 3 days after parent
+          subMilestone = `${parentDate.getFullYear()}.${parentDate.getMonth() + 1}.${parentDate.getDate()}`;
+        }
+      }
+      id.goals[gi].subGoals.push({ id: uid(), text: text.trim(), milestone: subMilestone, done: false });
       save();
       renderMain();
       updateAiReminders();
@@ -1103,11 +1124,69 @@
       const current = goal.milestone || '';
       const date = prompt('截止日期（如：2026.8.1）：', current);
       if (date !== null) {
+        const oldMilestone = goal.milestone;
         goal.milestone = date;
+        // Adjust subGoal milestones by the same offset
+        if (oldMilestone && goal.subGoals) {
+          const offset = parseDateOffset(oldMilestone, date);
+          if (offset !== 0) {
+            goal.subGoals.forEach(s => {
+              if (s.milestone) {
+                s.milestone = adjustDate(s.milestone, offset);
+              }
+            });
+          }
+        }
         save();
         renderMain();
         updateAiReminders();
       }
+    }
+
+    function setSubGoalMilestone(gi, si) {
+      const id = getActiveIdentity();
+      if (!id) return;
+      const goal = id.goals[gi];
+      if (!goal || !goal.subGoals) return;
+      const subGoal = goal.subGoals[si];
+      const current = subGoal.milestone || '';
+      const date = prompt('子目标日期（如：2026.8.1）：', current);
+      if (date !== null) {
+        subGoal.milestone = date;
+        save();
+        renderMain();
+        updateAiReminders();
+      }
+    }
+
+    // Parse date string to Date object, handles formats like 2026.8.1, 2026/8/1, 2026-8-1
+    function parseDate(dateStr) {
+      if (!dateStr) return null;
+      const normalized = dateStr.replace(/[\/\-]/g, '.');
+      const parts = normalized.split('.').map(p => parseInt(p, 10));
+      if (parts.length >= 2) {
+        const year = parts[0] || new Date().getFullYear();
+        const month = (parts[1] || 1) - 1;
+        const day = parts[2] || 1;
+        return new Date(year, month, day);
+      }
+      return null;
+    }
+
+    // Calculate offset in days between two date strings
+    function parseDateOffset(oldDateStr, newDateStr) {
+      const oldDate = parseDate(oldDateStr);
+      const newDate = parseDate(newDateStr);
+      if (!oldDate || !newDate) return 0;
+      return Math.round((newDate - oldDate) / (1000 * 60 * 60 * 24));
+    }
+
+    // Adjust a date string by N days
+    function adjustDate(dateStr, offsetDays) {
+      const date = parseDate(dateStr);
+      if (!date) return dateStr;
+      date.setDate(date.getDate() + offsetDays);
+      return `${date.getFullYear()}.${date.getMonth() + 1}.${date.getDate()}`;
     }
 
     function aiBreakSubGoal(gi, si) {
@@ -1118,10 +1197,21 @@
       addAiMsg(`关于「${subGoal.text}」，建议完成以下步骤：`);
       addAiMsg(`<p>${breakdowns.map(b => '• ' + b.text + (b.urgent?' 🔴':'')).join('<br>')}</p>`);
 
-      breakdowns.forEach(b => {
+      breakdowns.forEach((b, idx) => {
         const exists = id.goals[gi].subGoals.find(s => s.text === b.text);
         if (!exists) {
-          id.goals[gi].subGoals.push({ id: uid(), text: b.text, done: false });
+          // Calculate date distribution: spread evenly from now to parent deadline
+          let subMilestone = '';
+          const parentGoal = id.goals[gi];
+          const parentDate = parseDate(parentGoal.milestone);
+          if (parentDate) {
+            const now = new Date();
+            const totalDays = Math.max(1, Math.round((parentDate - now) / (1000 * 60 * 60 * 24)));
+            const step = Math.max(1, Math.round(totalDays / (breakdowns.length + 1)));
+            const targetDate = new Date(now.getTime() + step * (idx + 1) * 24 * 60 * 60 * 1000);
+            subMilestone = `${targetDate.getFullYear()}.${targetDate.getMonth() + 1}.${targetDate.getDate()}`;
+          }
+          id.goals[gi].subGoals.push({ id: uid(), text: b.text, milestone: subMilestone, done: false });
         }
       });
       save();
