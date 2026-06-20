@@ -1319,8 +1319,14 @@
     function editIdentity(id) {
       const obj = data.identities.find(i => i.id === id);
       if (!obj) return;
-      const newName = prompt('重命名身份:', obj.name);
-      if (newName && newName.trim()) { obj.name = newName.trim(); save(); renderTabs(); renderMain(); updateAiContext(); }
+      const newName = prompt('身份名称:', obj.name);
+      if (newName && newName.trim() !== obj.name) { obj.name = newName.trim(); }
+      const newDesc = prompt('详细描述:', obj.desc || '');
+      if (newDesc !== null) { obj.desc = newDesc.trim(); }
+      save();
+      renderTabs();
+      renderMain();
+      updateAiContext();
     }
 
     function deleteIdentity(id) {
@@ -1452,58 +1458,75 @@
       obj.startDate = startDate;
       obj.endDate = endDate;
 
-      // Adjust all goal milestones if the range shifted
-      if ((oldStart && oldEnd) || (startDate && endDate)) {
-        // Calculate total days in old vs new range
-        const parseD = (d) => { if (!d) return null; const p = d.split('.'); return p.length >= 3 ? new Date(parseInt(p[0]), parseInt(p[1])-1, parseInt(p[2])) : null; };
-        const oldStartD = parseD(oldStart);
-        const oldEndD = parseD(oldEnd);
-        const newStartD = parseD(startDate);
-        const newEndD = parseD(endDate);
+      const parseD = (d) => { if (!d) return null; const p = d.split('.'); return p.length >= 3 ? new Date(parseInt(p[0]), parseInt(p[1])-1, parseInt(p[2])) : null; };
+      const oldStartD = parseD(oldStart);
+      const oldEndD = parseD(oldEnd);
+      const newStartD = parseD(startDate);
+      const newEndD = parseD(endDate);
 
-        if (oldStartD && oldEndD && newStartD && newEndD) {
-          const oldTotal = (oldEndD - oldStartD) / (1000 * 60 * 60 * 24);
-          const newTotal = (newEndD - newStartD) / (1000 * 60 * 60 * 24);
+      // Adjust all goal and subGoal milestones if the range shifted
+      if (oldStartD && oldEndD && newStartD && newEndD) {
+        // Both old and new ranges exist - proportionally map old positions to new
+        const oldTotal = (oldEndD - oldStartD) / (1000 * 60 * 60 * 24);
+        const newTotal = (newEndD - newStartD) / (1000 * 60 * 60 * 24);
 
-          obj.goals.forEach(g => {
-            if (g.milestone) {
-              const gDate = parseD(g.milestone);
-              if (gDate) {
-                // Map old position to new position
-                const oldPos = (gDate - oldStartD) / (1000 * 60 * 60 * 24);
+        obj.goals.forEach(g => {
+          if (g.milestone) {
+            const gDate = parseD(g.milestone);
+            if (gDate) {
+              const oldPos = (gDate - oldStartD) / (1000 * 60 * 60 * 24);
+              const ratio = oldPos / oldTotal;
+              const newPos = Math.round(ratio * newTotal);
+              const newDateMs = newStartD.getTime() + newPos * 24 * 60 * 60 * 1000;
+              const nd = new Date(newDateMs);
+              g.milestone = `${nd.getFullYear()}.${nd.getMonth()+1}.${nd.getDate()}`;
+            }
+          }
+          (g.subGoals || []).forEach((s, si) => {
+            if (s.milestone) {
+              const sDate = parseD(s.milestone);
+              if (sDate) {
+                const oldPos = (sDate - oldStartD) / (1000 * 60 * 60 * 24);
                 const ratio = oldPos / oldTotal;
                 const newPos = Math.round(ratio * newTotal);
                 const newDateMs = newStartD.getTime() + newPos * 24 * 60 * 60 * 1000;
                 const nd = new Date(newDateMs);
-                g.milestone = `${nd.getFullYear()}.${nd.getMonth()+1}.${nd.getDate()}`;
+                s.milestone = `${nd.getFullYear()}.${nd.getMonth()+1}.${nd.getDate()}`;
               }
             }
-            (g.subGoals || []).forEach(s => {
-              if (s.milestone) {
-                const sDate = parseD(s.milestone);
-                if (sDate) {
-                  const oldPos = (sDate - oldStartD) / (1000 * 60 * 60 * 24);
-                  const ratio = oldPos / oldTotal;
-                  const newPos = Math.round(ratio * newTotal);
-                  const newDateMs = newStartD.getTime() + newPos * 24 * 60 * 60 * 1000;
-                  const nd = new Date(newDateMs);
-                  s.milestone = `${nd.getFullYear()}.${nd.getMonth()+1}.${nd.getDate()}`;
-                }
+          });
+        });
+      } else if ((!oldStart || !oldEnd) && newStartD && newEndD) {
+        // New range was set without old range - distribute goals evenly
+        const totalGoals = obj.goals.length;
+        const totalDays = (newEndD - newStartD) / (1000 * 60 * 60 * 24);
+
+        obj.goals.forEach((g, gi) => {
+          const ratio = totalGoals <= 1 ? 0.5 : gi / (totalGoals - 1);
+          const daysFromStart = Math.round(ratio * totalDays);
+          const targetDate = new Date(newStartD.getTime() + daysFromStart * 24 * 60 * 60 * 1000);
+          g.milestone = `${targetDate.getFullYear()}.${targetDate.getMonth()+1}.${targetDate.getDate()}`;
+
+          const subGoals = g.subGoals || [];
+          if (subGoals.length > 0) {
+            const nextGoalDate = gi < totalGoals - 1 ? (() => {
+              const nextG = obj.goals[gi + 1];
+              if (nextG && nextG.milestone) {
+                const nd = parseD(nextG.milestone);
+                return nd || new Date(newStartD.getTime() + (ratio + 1/(totalGoals-1)) * totalDays * 24 * 60 * 60 * 1000);
               }
+              return new Date(newStartD.getTime() + (ratio + 1/(totalGoals-1)) * totalDays * 24 * 60 * 60 * 1000);
+            })() : newEndD;
+
+            const subTotalDays = (nextGoalDate - targetDate) / (1000 * 60 * 60 * 24);
+            subGoals.forEach((s, si) => {
+              const subRatio = subGoals.length <= 1 ? 0.5 : si / (subGoals.length - 1);
+              const subDays = Math.round(subRatio * subTotalDays);
+              const subDate = new Date(targetDate.getTime() + subDays * 24 * 60 * 60 * 1000);
+              s.milestone = `${subDate.getFullYear()}.${subDate.getMonth()+1}.${subDate.getDate()}`;
             });
-          });
-        } else if (oldStart && !oldEnd && newStartD && newEndD) {
-          // New range was set, proportionally distribute milestones
-          obj.goals.forEach((g, gi) => {
-            if (g.milestone) {
-              const ratio = gi / Math.max(1, obj.goals.length - 1);
-              const daysOffset = Math.round(ratio * ((newEndD - newStartD) / (1000 * 60 * 60 * 24)));
-              const newDateMs = newStartD.getTime() + daysOffset * 24 * 60 * 60 * 1000;
-              const nd = new Date(newDateMs);
-              g.milestone = `${nd.getFullYear()}.${nd.getMonth()+1}.${nd.getDate()}`;
-            }
-          });
-        }
+          }
+        });
       }
 
       save();
