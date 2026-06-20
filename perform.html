@@ -960,15 +960,12 @@
     // ── Render Tabs ──
     function renderTabs() {
       const tabs = document.getElementById('identityTabs');
-      tabs.innerHTML = data.identities.map(id => {
-        const rangeStr = (id.startDate && id.endDate) ? `${id.startDate} - ${id.endDate}` : (id.endDate ? `至 ${id.endDate}` : '');
-        return `
+      tabs.innerHTML = data.identities.map(id => `
         <button class="identity-tab ${id.id === data.activeIdentityId ? 'active' : ''}" onclick="selectIdentity(${id.id})">
           <span class="identity-tab-dot" style="background:${id.color||'#C9A84C'}"></span>
           ${escHtml(id.name)}
-          ${rangeStr ? `<span class="identity-tab-range">· ${rangeStr}</span>` : ''}
         </button>
-      `}).join('');
+      `).join('');
     }
 
     function selectIdentity(id) {
