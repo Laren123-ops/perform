@@ -328,6 +328,63 @@
     }
     .sub-goal-date:hover { background: var(--gold-dim); color: var(--gold); }
 
+    /* Note Panel */
+    .goal-note-btn {
+      font-size: 11px;
+      color: var(--text-muted);
+      cursor: pointer;
+      padding: 2px 5px;
+      border-radius: 3px;
+      margin-left: 2px;
+    }
+    .goal-note-btn:hover { background: var(--gold-dim); color: var(--gold); }
+    .goal-note-btn.has-note { color: var(--gold); }
+    .goal-note-panel {
+      display: none;
+      padding: 10px 12px;
+      margin: 6px 12px;
+      background: var(--surface);
+      border: 1px solid var(--border-light);
+      border-radius: var(--radius-sm);
+    }
+    .goal-note-panel.open { display: block; }
+    .goal-note-panel textarea {
+      width: 100%;
+      min-height: 60px;
+      padding: 8px;
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      font-family: var(--font-body);
+      font-size: 12px;
+      color: var(--text);
+      background: var(--card);
+      resize: vertical;
+      outline: none;
+      box-sizing: border-box;
+    }
+    .goal-note-panel textarea:focus { border-color: var(--gold); }
+    .goal-note-table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 11px;
+      margin-top: 6px;
+    }
+    .goal-note-table th, .goal-note-table td {
+      border: 1px solid var(--border);
+      padding: 4px 6px;
+      text-align: left;
+    }
+    .goal-note-table th { background: var(--gold-dim); font-weight: 500; }
+    .goal-note-table tr:nth-child(even) { background: var(--surface); }
+    .note-add-row-btn {
+      font-size: 10px;
+      color: var(--gold);
+      cursor: pointer;
+      margin-top: 4px;
+      padding: 2px 4px;
+    }
+    .note-add-row-btn:hover { text-decoration: underline; }
+
     /* Add Goal */
     .add-goal-row {
       display: flex;
@@ -1104,6 +1161,8 @@
       const hasChildren = (g.subGoals || []).length > 0;
       const doneCount = (g.subGoals||[]).filter(s=>s.done).length;
       const totalCount = (g.subGoals||[]).length;
+      const hasNote = g.note && g.note.trim();
+      const noteTable = g.noteTable || [];
 
       return `
         <div class="goal-item ${g.done ? 'done' : ''}" data-index="${gi}">
@@ -1114,22 +1173,38 @@
             ${g.milestone ? `<span class="milestone-marker">📅 ${escHtml(g.milestone)}</span>` : ''}
             ${totalCount > 0 ? `<span class="goal-badge">${doneCount}/${totalCount}</span>` : ''}
             <div class="goal-actions">
+              <button class="goal-action-btn goal-note-btn ${hasNote ? 'has-note' : ''}" onclick="event.stopPropagation();toggleGoalNote(${gi}, ${parentIndex})" title="笔记">📝</button>
               <button class="goal-action-btn" onclick="event.stopPropagation();addSubGoal(${gi})" title="添加子目标">+子目标</button>
               <button class="goal-action-btn" onclick="event.stopPropagation();setGoalMilestone(${gi}, ${parentIndex})" title="设置截止">📅</button>
               <button class="goal-action-btn del" onclick="event.stopPropagation();deleteGoal(${gi}, ${parentIndex})" title="删除">×</button>
             </div>
           </div>
+          <div class="goal-note-panel" id="note-panel-${gi}">
+            <textarea placeholder="写笔记...（支持多行）" onblur="saveGoalNote(${gi}, ${parentIndex}, this.value)">${escHtml(g.note || '')}</textarea>
+            <div style="margin-top:8px;font-size:11px;color:var(--text-muted)">表格记录（可选）</div>
+            ${noteTable.length > 0 ? `<table class="goal-note-table"><tr><th>状态</th><th>内容</th><th></th></tr>${noteTable.map((row, ri) => `<tr><td>${escHtml(row.status || '')}</td><td>${escHtml(row.text || '')}</td><td><button onclick="event.stopPropagation();deleteNoteRow(${gi}, ${parentIndex}, ${ri})" style="background:none;border:none;color:var(--accent-red);cursor:pointer">×</button></td></tr>`).join('')}</table>` : ''}
+            <div class="note-add-row-btn" onclick="event.stopPropagation();addNoteRow(${gi}, ${parentIndex})">+ 添加一行</div>
+          </div>
           ${hasChildren ? `
             <div class="goal-children open" id="children-${gi}">
-              ${(g.subGoals||[]).map((s, si) => `
+              ${(g.subGoals||[]).map((s, si) => {
+                const subHasNote = s.note && s.note.trim();
+                const subNoteTable = s.noteTable || [];
+                return `
                 <div class="sub-goal-item ${s.done ? 'done' : ''}">
                   <div class="sub-goal-check" onclick="toggleSubGoalDone(${gi}, ${si})"></div>
                   <span class="sub-goal-text">${escHtml(s.text)}</span>
                   ${s.milestone ? `<span class="sub-goal-date" onclick="event.stopPropagation();setSubGoalMilestone(${gi}, ${si})">📅 ${escHtml(s.milestone)}</span>` : `<span class="sub-goal-date" onclick="event.stopPropagation();setSubGoalMilestone(${gi}, ${si})">+日期</span>`}
+                  <span class="goal-note-btn ${subHasNote ? 'has-note' : ''}" onclick="event.stopPropagation();toggleGoalNote(${gi}, ${si}, true)" title="笔记">📝</span>
                   <span class="sub-goal-ai" onclick="event.stopPropagation();aiBreakSubGoal(${gi}, ${si})" title="AI拆解">✨</span>
                   <button class="goal-action-btn del" style="opacity:0" onmouseover="this.style.opacity=1" onmouseout="this.style.opacity=0" onclick="event.stopPropagation();deleteSubGoal(${gi},${si})">×</button>
+                  <div class="goal-note-panel" id="note-panel-sub-${gi}-${si}">
+                    <textarea placeholder="写笔记..." onblur="saveGoalNote(${gi}, ${si}, this.value, true)">${escHtml(s.note || '')}</textarea>
+                    ${subNoteTable.length > 0 ? `<table class="goal-note-table"><tr><th>状态</th><th>内容</th><th></th></tr>${subNoteTable.map((row, ri) => `<tr><td>${escHtml(row.status || '')}</td><td>${escHtml(row.text || '')}</td><td><button onclick="event.stopPropagation();deleteNoteRow(${gi}, ${si}, ${ri}, true)" style="background:none;border:none;color:var(--accent-red);cursor:pointer">×</button></td></tr>`).join('')}</table>` : ''}
+                    <div class="note-add-row-btn" onclick="event.stopPropagation();addNoteRow(${gi}, ${si}, true)">+ 添加一行</div>
+                  </div>
                 </div>
-              `).join('')}
+              `}).join('')}
             </div>` : ''}
         </div>`;
     }
@@ -1247,6 +1322,72 @@
       save();
       renderMain();
       updateAiReminders();
+    }
+
+    function toggleGoalNote(gi, si, isSub = false) {
+      let panelId;
+      if (isSub) {
+        panelId = `note-panel-sub-${gi}-${si}`;
+      } else {
+        panelId = `note-panel-${gi}`;
+      }
+      const panel = document.getElementById(panelId);
+      if (!panel) return;
+      panel.classList.toggle('open');
+    }
+
+    function saveGoalNote(gi, si, value, isSub = false) {
+      const id = getActiveIdentity();
+      if (!id) return;
+      if (isSub) {
+        if (id.goals[gi] && id.goals[gi].subGoals && id.goals[gi].subGoals[si]) {
+          id.goals[gi].subGoals[si].note = value;
+        }
+      } else {
+        if (id.goals[gi]) {
+          id.goals[gi].note = value;
+        }
+      }
+      save();
+      renderMain();
+    }
+
+    function addNoteRow(gi, si, isSub = false) {
+      const id = getActiveIdentity();
+      if (!id) return;
+      const status = prompt('状态（如：已投递/面试中/待回复/拒绝）:', '') || '';
+      const text = prompt('内容:', '');
+      if (!text) return;
+      const row = { status, text };
+      if (isSub) {
+        if (!id.goals[gi].subGoals[si].noteTable) id.goals[gi].subGoals[si].noteTable = [];
+        id.goals[gi].subGoals[si].noteTable.push(row);
+      } else {
+        if (!id.goals[gi].noteTable) id.goals[gi].noteTable = [];
+        id.goals[gi].noteTable.push(row);
+      }
+      save();
+      renderMain();
+      // Re-open the note panel
+      let panelId = isSub ? `note-panel-sub-${gi}-${si}` : `note-panel-${gi}`;
+      const panel = document.getElementById(panelId);
+      if (panel) panel.classList.add('open');
+    }
+
+    function deleteNoteRow(gi, si, ri, isSub = false) {
+      const id = getActiveIdentity();
+      if (!id) return;
+      if (isSub) {
+        id.goals[gi].subGoals[si].noteTable.splice(ri, 1);
+      } else {
+        id.goals[gi].noteTable.splice(ri, 1);
+      }
+      save();
+      renderMain();
+      // Re-open the note panel
+      let panelId = isSub ? `note-panel-sub-${gi}-${si}` : `note-panel-${gi}`;
+      const panel = document.getElementById(panelId);
+      if (panel) panel.classList.add('open');
     }
 
     function setGoalMilestone(gi, parentIndex) {
